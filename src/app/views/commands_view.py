@@ -245,18 +245,11 @@ class CommandsView(BaseView):
         Args:
             cmd: Command yang disalin.
         """
-        clip = ft.Clipboard()
-        self.page.overlay.append(clip)
-        self.page.update()
-        await clip.set(cmd.command_text)
+        from src.app.utils.clipboard import copy_to_clipboard
 
-        snack = ft.SnackBar(
-            ft.Text(f'Command "{cmd.title}" disalin.'),
-            bgcolor=PALETTE["state.success"],
+        copy_to_clipboard(
+            self.page, cmd.command_text, f'Command "{cmd.title}" disalin.'
         )
-        self.page.overlay.append(snack)
-        snack.open = True
-        self.page.update()
 
 
 def _action_button(

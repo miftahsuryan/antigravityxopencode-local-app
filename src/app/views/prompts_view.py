@@ -280,18 +280,11 @@ class PromptsView(BaseView):
         Args:
             prompt: Prompt yang disalin.
         """
-        clip = ft.Clipboard()
-        self.page.overlay.append(clip)
-        self.page.update()
-        await clip.set(prompt.content)
+        from src.app.utils.clipboard import copy_to_clipboard
 
-        snack = ft.SnackBar(
-            ft.Text(f'Prompt "{prompt.title}" disalin.'),
-            bgcolor=PALETTE["state.success"],
+        copy_to_clipboard(
+            self.page, prompt.content, f'Prompt "{prompt.title}" disalin.'
         )
-        self.page.overlay.append(snack)
-        snack.open = True
-        self.page.update()
 
 
 def _action_button(

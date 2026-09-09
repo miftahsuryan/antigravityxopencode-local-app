@@ -15,48 +15,40 @@ from src.app.theme import PALETTE
 
 
 class BaseView:
-    """Basis view: header, daftar item, dan aksi tambah.
-
-    Subclass mengisi ``build_list`` dan ``build_form`` untuk konten spesifik.
-    """
+    """Base class untuk semua view modul."""
 
     def __init__(
         self,
         page: ft.Page,
         title: str,
         icon: Any,
-        on_add: Callable[[], None] | None = None,
+        on_add: Callable[[], None],
     ) -> None:
-        """Inisialisasi view.
+        """Inisialisasi view dasar.
 
         Args:
             page: objek Page Flet.
-            title: judul yang ditampilkan di header.
-            icon: ikon Flet untuk modul.
+            title: judul modul.
+            icon: ikon Flet untuk sidebar.
             on_add: callback saat tombol tambah diklik.
         """
         self.page = page
         self.title = title
         self.icon = icon
         self.on_add = on_add
-        self.list_area = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO)
+        self.list_area = ft.Column(spacing=8)
 
     def header(self) -> ft.Row:
         """Buat baris header: judul + tombol tambah.
 
         Returns:
-            Row berisi judul modul dan tombol "+ Tambah".
+            Row berisi judul modul dan tombol \"+ Tambah\".
         """
-        add_button = ft.ElevatedButton(
-            content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ADD, color=PALETTE["bg.base"]),
-                    ft.Text("Tambah", color=PALETTE["bg.base"]),
-                ],
-                spacing=4,
-            ),
-            bgcolor=PALETTE["accent.primary"],
-            on_click=lambda _: self._handle_add(),
+        add_button = ft.IconButton(
+            icon=ft.Icons.ADD,
+            icon_color=PALETTE["accent.primary"],
+            tooltip="Tambah " + self.title,
+            on_click=lambda _: self.on_add(),
         )
         return ft.Row(
             [
@@ -73,11 +65,6 @@ class BaseView:
             alignment=ft.MainAxisAlignment.START,
             spacing=8,
         )
-
-    def _handle_add(self) -> None:
-        """Panggil callback tambah (jika ada)."""
-        if self.on_add:
-            self.on_add()
 
     def empty_state(self, message: str) -> ft.Container:
         """Tampilkan pesan saat daftar kosong.

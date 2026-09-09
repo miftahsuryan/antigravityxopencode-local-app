@@ -1,0 +1,6 @@
+flet>=0.24
+keyring>=25.0
+pytest>=8.0
+black>=24.0
+ruff>=0.6
+mypy>=1.10

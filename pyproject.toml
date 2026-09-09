@@ -1,0 +1,33 @@
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = '''
+/(
+  # directories
+  \.venv
+  | build
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [
+    ".venv",
+    "build",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    '^build/',
+    '^\.venv/',
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

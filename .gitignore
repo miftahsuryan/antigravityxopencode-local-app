@@ -1,9 +1,54 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
 build/
-data/
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.localized
+
+# Python tools
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.coverage
+htmlcov/
+*.egg
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Flet / Flutter build
+.flet/
+build/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+secrets.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+Thumbs.db
+Desktop.ini

@@ -15,6 +15,7 @@ class Note:
     id: int | None
     title: str
     file_path: str
+    content: str = ""
     tags: list[str] = field(default_factory=list)
     folder: str = ""
     created_at: datetime | None = None

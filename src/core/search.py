@@ -41,18 +41,20 @@ def search_all(
 
     # Notes
     rows = conn.execute(
-        """SELECT id, title, file_path FROM notes
-           WHERE title LIKE ? OR tags LIKE ? OR folder LIKE ?
+        """SELECT id, title, file_path, content FROM notes
+           WHERE title LIKE ? OR tags LIKE ? OR folder LIKE ? OR content LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
-        (pattern, pattern, pattern, limit),
+        (pattern, pattern, pattern, pattern, limit),
     ).fetchall()
     for r in rows:
+        # Show content preview if title matches file_path
+        snippet = r["content"][:80] + "..." if len(r["content"]) > 80 else r["content"]
         results.append(
             SearchResult(
                 module="notes",
                 item_id=r["id"],
                 title=r["title"],
-                snippet=r["file_path"],
+                snippet=snippet,
             )
         )
 

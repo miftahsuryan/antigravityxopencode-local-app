@@ -51,13 +51,13 @@ devcodex/
 └── data/                  # sample/vault lokal utk dev — DB asli di App Support (di-gitignore)
 ```
 
-## 4. Fitur Inti (v1 — MVP)
+## 4. Fitur Inti (v1 — MVP Selesai)
 
-1. **Notes** — CRUD catatan Markdown, folder + tag, live preview, full-text search.
-2. **Prompt Library** — simpan prompt AI, kategori per tool/model, tag, favorit/pin, quick-copy.
-3. **Command Snippets** — simpan command terminal + deskripsi + tag (docker/git/npm/dst.), quick-copy. **Tidak ada eksekusi otomatis** di v1 (lihat aturan keamanan).
-4. **API References** — simpan nama service, base URL, deskripsi, tipe auth, tag. Nilai secret asli disimpan di Keychain, bukan di database.
-5. **Cross-cutting:** global search (lintas 4 modul sekaligus), sidebar navigasi 4 section + search bar di atas, dark mode sebagai default (lihat `docs/brand_guidelines.md`), import/export ke JSON untuk backup manual.
+1. **Notes** — CRUD catatan Markdown, folder + tag, full-text search, **copy ke clipboard**, **filter by tag**, tampilan konten penuh.
+2. **Prompt Library** — simpan prompt AI, kategori per tool/model, tag, favorit/pin, **quick-copy**, **filter by tag**.
+3. **Command Snippets** — simpan command terminal + deskripsi + tag, **quick-copy**, **filter by tag**.
+4. **API References** — simpan nama service, base URL, deskripsi, tipe auth, tag. Secret disimpan di **macOS Keychain**, dapat di-reveal dan disalin langsung dari kartu.
+5. **Cross-cutting:** global search (lintas 4 modul sekaligus), sidebar navigasi 4 section + search bar di atas, dark mode sebagai default, **filter tag pada setiap modul**, **copy to clipboard**.
 
 Fitur yang **sengaja ditunda** ke v2+ (jangan dikerjakan tanpa diminta eksplisit): sync cloud, run-command langsung dari app, multi-user/sharing, plugin pihak ketiga.
 

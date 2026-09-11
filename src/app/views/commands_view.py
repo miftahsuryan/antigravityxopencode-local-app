@@ -12,6 +12,7 @@ from typing import Any
 import flet as ft
 
 from src.app.theme import PALETTE
+from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import Command
 from src.core.storage import commands_repo
@@ -29,6 +30,7 @@ class CommandsView(BaseView):
         """
         super().__init__(page, "Commands", ft.Icons.TERMINAL_OUTLINED, self._open_add)
         self.conn = conn
+        self._current_filter_tag: str | None = None
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -141,6 +143,51 @@ class CommandsView(BaseView):
         self.page.show_dialog(dialog)
 
     # ------------------------------------------------------------------
+    # Filter & tag
+    # ------------------------------------------------------------------
+
+    def _chip_click(self, tag: str) -> None:
+        """Toggle filter by tag saat tag chip diklik.
+
+        Args:
+            tag: Tag yang diklik.
+        """
+        if self._current_filter_tag == tag:
+            self._current_filter_tag = None
+        else:
+            self._current_filter_tag = tag
+        self._apply_filter()
+
+    def _clear_filter(self) -> None:
+        """Hapus filter tag dan tampilkan semua command."""
+        self._current_filter_tag = None
+        self.refresh()
+
+    def _apply_filter(self) -> None:
+        """Terapkan filter berdasarkan tag yang sedang aktif."""
+        commands = commands_repo.list_commands(self.conn)
+        self.list_area.controls.clear()
+
+        if self._current_filter_tag:
+            filtered = [c for c in commands if self._current_filter_tag in c.tags]
+            if not filtered:
+                tag = self._current_filter_tag
+                msg = f"Tidak ada command dengan tag '{tag}'"
+                self.list_area.controls.append(self.empty_state(msg))
+            else:
+                for c in filtered:
+                    self.list_area.controls.append(self._item_card(c))
+        else:
+            if not commands:
+                self.list_area.controls.append(
+                    self.empty_state("Belum ada command. Tambahkan yang pertama!")
+                )
+            else:
+                for c in commands:
+                    self.list_area.controls.append(self._item_card(c))
+        self.page.update()
+
+    # ------------------------------------------------------------------
     # Render
     # ------------------------------------------------------------------
 
@@ -168,18 +215,12 @@ class CommandsView(BaseView):
             Container kartu command.
         """
         tag_chips: list[ft.Control] = [
-            ft.Container(
-                content=ft.Text(t, size=11, color=PALETTE["text.secondary"]),
-                bgcolor=PALETTE["bg.surface-hover"],
-                padding=ft.Padding.symmetric(horizontal=8, vertical=2),
-                border_radius=8,
-            )
-            for t in cmd.tags
+            self._tag_chip(t) for t in cmd.tags
         ]
         return ft.Container(
-            content=ft.Row(
+            content=ft.Column(
                 [
-                    ft.Column(
+                    ft.Row(
                         [
                             ft.Text(
                                 cmd.title,
@@ -187,51 +228,47 @@ class CommandsView(BaseView):
                                 weight=ft.FontWeight.W_600,
                                 color=PALETTE["text.primary"],
                             ),
-                            ft.Container(
-                                content=ft.Text(
-                                    cmd.command_text,
-                                    size=13,
-                                    color=PALETTE["accent.mint"],
-                                    style=ft.TextStyle(font_family="monospace"),
-                                ),
-                                bgcolor=PALETTE["bg.surface-hover"],
-                                padding=ft.Padding.symmetric(horizontal=10, vertical=6),
-                                border_radius=6,
+                            ft.Container(expand=True),
+                            ft.IconButton(
+                                icon=ft.Icons.CONTENT_COPY,
+                                icon_color=PALETTE["text.secondary"],
+                                tooltip="Copy",
+                                on_click=lambda e, c=cmd: self._copy(c),
                             ),
-                            ft.Text(
-                                cmd.description or "",
-                                size=12,
-                                color=PALETTE["text.secondary"],
-                                max_lines=2,
+                            _action_button(
+                                ft.Icons.EDIT_OUTLINED,
+                                "Edit",
+                                lambda e, c=cmd: self._open_edit(c),
                             ),
-                            (
-                                ft.Row(tag_chips, spacing=4)
-                                if tag_chips
-                                else ft.Container()
+                            _action_button(
+                                ft.Icons.DELETE_OUTLINE,
+                                "Hapus",
+                                lambda e, c=cmd: self._delete(c),
+                                danger=True,
                             ),
                         ],
                         spacing=4,
-                        expand=True,
                     ),
-                    ft.IconButton(
-                        icon=ft.Icons.CONTENT_COPY,
-                        icon_color=PALETTE["text.secondary"],
-                        tooltip="Copy",
-                        on_click=lambda e, c=cmd: self._copy(c),
+                    ft.Row(tag_chips, spacing=4) if tag_chips else ft.Container(),
+                    ft.Container(
+                        content=ft.Text(
+                            cmd.command_text,
+                            size=13,
+                            color=PALETTE["accent.mint"],
+                            style=ft.TextStyle(font_family="monospace"),
+                        ),
+                        bgcolor=PALETTE["bg.surface-hover"],
+                        padding=ft.Padding.symmetric(horizontal=10, vertical=6),
+                        border_radius=6,
                     ),
-                    _action_button(
-                        ft.Icons.EDIT_OUTLINED,
-                        "Edit",
-                        lambda e, c=cmd: self._open_edit(c),
-                    ),
-                    _action_button(
-                        ft.Icons.DELETE_OUTLINE,
-                        "Hapus",
-                        lambda e, c=cmd: self._delete(c),
-                        danger=True,
+                    ft.Text(
+                        cmd.description or "",
+                        size=12,
+                        color=PALETTE["text.secondary"],
+                        max_lines=2,
                     ),
                 ],
-                spacing=8,
+                spacing=4,
             ),
             bgcolor=PALETTE["bg.surface"],
             border=ft.Border.all(1, PALETTE["border.subtle"]),
@@ -239,14 +276,37 @@ class CommandsView(BaseView):
             padding=12,
         )
 
-    async def _copy(self, cmd: Command) -> None:
+    def _tag_chip(self, tag: str) -> ft.Container:
+        """Buat tag chip yang bisa diklik untuk filter.
+
+        Args:
+            tag: Teks tag.
+
+        Returns:
+            Container yang bisa diklik.
+        """
+        is_active = self._current_filter_tag == tag
+        accent = PALETTE["accent.primary"]
+        surface = PALETTE["bg.surface-hover"]
+        base = PALETTE["bg.base"]
+        secondary = PALETTE["text.secondary"]
+        chip_bg = accent if is_active else surface
+        chip_fg = base if is_active else secondary
+        return ft.Container(
+            content=ft.Text(tag, size=11, color=chip_fg),
+            bgcolor=chip_bg,
+            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
+            border_radius=8,
+            on_click=lambda e, t=tag: self._chip_click(t),
+            ink=True,
+        )
+
+    def _copy(self, cmd: Command) -> None:
         """Salin command ke clipboard & tampilkan snackbar.
 
         Args:
             cmd: Command yang disalin.
         """
-        from src.app.utils.clipboard import copy_to_clipboard
-
         copy_to_clipboard(
             self.page, cmd.command_text, f'Command "{cmd.title}" disalin.'
         )

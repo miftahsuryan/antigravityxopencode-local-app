@@ -1,39 +1,46 @@
-"""Helper untuk copy ke clipboard dengan pbcopy (macOS) + fallback ft.Clipboard."""
+"""Helper untuk copy ke clipboard — gabungan pbcopy + ft.Clipboard."""
 
-import asyncio
 import subprocess
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import flet as ft
+import flet as ft
 
 
 def copy_to_clipboard(
     page: "ft.Page", text: str, message: str = "Disalin ke clipboard!"
 ) -> None:
-    """Salin teks ke clipboard menggunakan pbcopy (macOS) + fallback ft.Clipboard.
+    """Salin teks ke clipboard menggunakan pbcopy (macOS native).
 
     Args:
         page: Objek page Flet.
         text: Teks yang akan disalin.
-        message: Pesan untuk SnackBar (optional).
+        message: Pesan untuk SnackBar.
     """
-    # Coba copy via pbcopy (macOS native)
+    copied = False
     try:
-        subprocess.run(["pbcopy"], input=text, text=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Fallback ke ft.Clipboard jika pbcopy gagal
-        async def _async_copy() -> None:
-            clip = ft.Clipboard()
-            page.overlay.append(clip)
-            page.update()
-            await clip.set(text)
+        subprocess.run(
+            ["pbcopy"],
+            input=text.encode("utf-8"),
+            check=True,
+            timeout=5,
+        )
+        copied = True
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+    ):
+        copied = False
 
-        # Schedule async operation
-        asyncio.create_task(_async_copy())
-
-    # Tampilkan feedback
-    snack = ft.SnackBar(ft.Text(message), bgcolor="#3DDC84")
-    page.overlay.append(snack)
-    snack.open = True
-    page.update()
+    if copied:
+        snack = ft.SnackBar(ft.Text(message), bgcolor="#3DDC84")
+        page.overlay.append(snack)
+        snack.open = True
+        page.update()
+    else:
+        snack = ft.SnackBar(
+            ft.Text("Gagal menyalin ke clipboard."),
+            bgcolor="#F5484B",
+        )
+        page.overlay.append(snack)
+        snack.open = True
+        page.update()

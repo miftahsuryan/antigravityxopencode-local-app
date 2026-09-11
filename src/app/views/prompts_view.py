@@ -11,6 +11,7 @@ from typing import Any
 import flet as ft
 
 from src.app.theme import PALETTE
+from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import Prompt
 from src.core.storage import prompts_repo
@@ -30,6 +31,7 @@ class PromptsView(BaseView):
             page, "Prompts", ft.Icons.AUTO_AWESOME_OUTLINED, self._open_add
         )
         self.conn = conn
+        self._current_filter_tag: str | None = None
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -152,6 +154,53 @@ class PromptsView(BaseView):
         self.page.show_dialog(dialog)
 
     # ------------------------------------------------------------------
+    # Filter & tag
+    # ------------------------------------------------------------------
+
+    def _chip_click(self, tag: str) -> None:
+        """Toggle filter by tag saat tag chip diklik.
+
+        Args:
+            tag: Tag yang diklik.
+        """
+        if self._current_filter_tag == tag:
+            self._current_filter_tag = None
+        else:
+            self._current_filter_tag = tag
+        self._apply_filter()
+
+    def _clear_filter(self) -> None:
+        """Hapus filter tag dan tampilkan semua prompt."""
+        self._current_filter_tag = None
+        self.refresh()
+
+    def _apply_filter(self) -> None:
+        """Terapkan filter berdasarkan tag yang sedang aktif."""
+        prompts = prompts_repo.list_prompts(self.conn)
+        self.list_area.controls.clear()
+
+        if self._current_filter_tag:
+            filtered = [p for p in prompts if self._current_filter_tag in p.tags]
+            if not filtered:
+                tag = self._current_filter_tag
+                msg = f"Tidak ada prompt dengan tag '{tag}'"
+                self.list_area.controls.append(self.empty_state(msg))
+            else:
+                for p in filtered:
+                    self.list_area.controls.append(self._item_card(p))
+        else:
+            if not prompts:
+                self.list_area.controls.append(
+                    self.empty_state("Belum ada prompt. Tambahkan yang pertama!")
+                )
+            else:
+                for p in sorted(
+                    prompts, key=lambda x: (not x.is_favorite, x.updated_at or 0)
+                ):
+                    self.list_area.controls.append(self._item_card(p))
+        self.page.update()
+
+    # ------------------------------------------------------------------
     # Render
     # ------------------------------------------------------------------
 
@@ -181,13 +230,7 @@ class PromptsView(BaseView):
             Container kartu prompt.
         """
         tag_chips: list[ft.Control] = [
-            ft.Container(
-                content=ft.Text(t, size=11, color=PALETTE["text.secondary"]),
-                bgcolor=PALETTE["bg.surface-hover"],
-                padding=ft.Padding.symmetric(horizontal=8, vertical=2),
-                border_radius=8,
-            )
-            for t in prompt.tags
+            self._tag_chip(t) for t in prompt.tags
         ]
         star_color = (
             PALETTE["state.warning"]
@@ -195,78 +238,67 @@ class PromptsView(BaseView):
             else PALETTE["text.secondary"]
         )
         return ft.Container(
-            content=ft.Row(
+            content=ft.Column(
                 [
-                    ft.IconButton(
-                        icon=ft.Icons.STAR,
-                        icon_color=star_color,
-                        tooltip="Favorit",
-                        on_click=lambda e, p=prompt: self._toggle_favorite(p),
-                    ),
-                    ft.Column(
+                    ft.Row(
                         [
-                            ft.Row(
-                                [
-                                    ft.Text(
-                                        prompt.title,
-                                        size=16,
-                                        weight=ft.FontWeight.W_600,
-                                        color=PALETTE["text.primary"],
-                                    ),
-                                    ft.Container(
-                                        content=ft.Text(
-                                            prompt.tool,
-                                            size=11,
-                                            color=PALETTE["accent.mint"],
-                                        ),
-                                        bgcolor=PALETTE["bg.surface-hover"],
-                                        padding=ft.Padding.symmetric(
-                                            horizontal=6, vertical=2
-                                        ),
-                                        border_radius=6,
-                                    ),
-                                ],
-                                spacing=6,
+                            ft.IconButton(
+                                icon=ft.Icons.STAR,
+                                icon_color=star_color,
+                                tooltip="Favorit",
+                                on_click=lambda e, p=prompt: self._toggle_favorite(p),
                             ),
                             ft.Text(
-                                (prompt.content or "")[:120]
-                                + (
-                                    "…"
-                                    if prompt.content and len(prompt.content) > 120
-                                    else ""
-                                ),
-                                size=12,
-                                color=PALETTE["text.secondary"],
-                                max_lines=2,
+                                prompt.title,
+                                size=16,
+                                weight=ft.FontWeight.W_600,
+                                color=PALETTE["text.primary"],
                             ),
-                            (
-                                ft.Row(tag_chips, spacing=4)
-                                if tag_chips
-                                else ft.Container()
+                            ft.Container(expand=True),
+                            ft.IconButton(
+                                icon=ft.Icons.CONTENT_COPY,
+                                icon_color=PALETTE["text.secondary"],
+                                tooltip="Copy",
+                                on_click=lambda e, p=prompt: self._copy(p),
+                            ),
+                            _action_button(
+                                ft.Icons.EDIT_OUTLINED,
+                                "Edit",
+                                lambda e, p=prompt: self._open_edit(p),
+                            ),
+                            _action_button(
+                                ft.Icons.DELETE_OUTLINE,
+                                "Hapus",
+                                lambda e, p=prompt: self._delete(p),
+                                danger=True,
                             ),
                         ],
                         spacing=4,
-                        expand=True,
                     ),
-                    ft.IconButton(
-                        icon=ft.Icons.CONTENT_COPY,
-                        icon_color=PALETTE["text.secondary"],
-                        tooltip="Copy",
-                        on_click=lambda e, p=prompt: self._copy(p),
+                    ft.Row(tag_chips, spacing=4) if tag_chips else ft.Container(),
+                    ft.Text(
+                        (prompt.content or "")[:120]
+                        + (
+                            "…"
+                            if prompt.content and len(prompt.content) > 120
+                            else ""
+                        ),
+                        size=12,
+                        color=PALETTE["text.secondary"],
+                        max_lines=2,
                     ),
-                    _action_button(
-                        ft.Icons.EDIT_OUTLINED,
-                        "Edit",
-                        lambda e, p=prompt: self._open_edit(p),
-                    ),
-                    _action_button(
-                        ft.Icons.DELETE_OUTLINE,
-                        "Hapus",
-                        lambda e, p=prompt: self._delete(p),
-                        danger=True,
+                    ft.Container(
+                        content=ft.Text(
+                            prompt.tool,
+                            size=11,
+                            color=PALETTE["accent.mint"],
+                        ),
+                        bgcolor=PALETTE["bg.surface-hover"],
+                        padding=ft.Padding.symmetric(horizontal=6, vertical=2),
+                        border_radius=6,
                     ),
                 ],
-                spacing=8,
+                spacing=4,
             ),
             bgcolor=PALETTE["bg.surface"],
             border=ft.Border.all(1, PALETTE["border.subtle"]),
@@ -274,14 +306,37 @@ class PromptsView(BaseView):
             padding=12,
         )
 
-    async def _copy(self, prompt: Prompt) -> None:
+    def _tag_chip(self, tag: str) -> ft.Container:
+        """Buat tag chip yang bisa diklik untuk filter.
+
+        Args:
+            tag: Teks tag.
+
+        Returns:
+            Container yang bisa diklik.
+        """
+        is_active = self._current_filter_tag == tag
+        accent = PALETTE["accent.primary"]
+        surface = PALETTE["bg.surface-hover"]
+        base = PALETTE["bg.base"]
+        secondary = PALETTE["text.secondary"]
+        chip_bg = accent if is_active else surface
+        chip_fg = base if is_active else secondary
+        return ft.Container(
+            content=ft.Text(tag, size=11, color=chip_fg),
+            bgcolor=chip_bg,
+            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
+            border_radius=8,
+            on_click=lambda e, t=tag: self._chip_click(t),
+            ink=True,
+        )
+
+    def _copy(self, prompt: Prompt) -> None:
         """Salin isi prompt ke clipboard & tampilkan snackbar.
 
         Args:
             prompt: Prompt yang disalin.
         """
-        from src.app.utils.clipboard import copy_to_clipboard
-
         copy_to_clipboard(
             self.page, prompt.content, f'Prompt "{prompt.title}" disalin.'
         )

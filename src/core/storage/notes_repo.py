@@ -19,6 +19,7 @@ def _row_to_note(row: sqlite3.Row) -> Note:
         id=row["id"],
         title=row["title"],
         file_path=row["file_path"],
+        content=row["content"],
         tags=json.loads(row["tags"]),
         folder=row["folder"],
         created_at=datetime.fromisoformat(row["created_at"]),
@@ -37,8 +38,9 @@ def create_note(conn: sqlite3.Connection, note: Note) -> Note:
         Note dengan id yang sudah terisi.
     """
     cur = conn.execute(
-        "INSERT INTO notes (title, file_path, tags, folder) VALUES (?, ?, ?, ?)",
-        (note.title, note.file_path, json.dumps(note.tags), note.folder),
+        "INSERT INTO notes (title, file_path, content, tags, folder) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (note.title, note.file_path, note.content, json.dumps(note.tags), note.folder),
     )
     conn.commit()
     return _row_to_note(
@@ -85,10 +87,17 @@ def update_note(conn: sqlite3.Connection, note: Note) -> Note | None:
     """
     conn.execute(
         """UPDATE notes
-           SET title = ?, file_path = ?, tags = ?, folder = ?,
+           SET title = ?, file_path = ?, content = ?, tags = ?, folder = ?,
                updated_at = strftime('%Y-%m-%dT%H:%M:%S','now')
          WHERE id = ?""",
-        (note.title, note.file_path, json.dumps(note.tags), note.folder, note.id),
+        (
+            note.title,
+            note.file_path,
+            note.content,
+            json.dumps(note.tags),
+            note.folder,
+            note.id,
+        ),
     )
     conn.commit()
     return get_note(conn, note.id)  # type: ignore[arg-type]

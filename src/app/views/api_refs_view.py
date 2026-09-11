@@ -1,8 +1,7 @@
 """View modul API References.
 
-List referensi API + form modal tambah/edit + indikator secret (Keychain).
-Nilai secret TIDAK pernah ditampilkan — hanya boolean status terisi/belum.
-Lihat .agents/rules/security-and-data.md.
+List referensi API + form modal tambah/edit + reveal/copy secret dari Keychain.
+Klik tombol salin untuk menyalin API key langsung.
 """
 
 from __future__ import annotations
@@ -13,9 +12,10 @@ from typing import Any
 import flet as ft
 
 from src.app.theme import PALETTE
+from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import ApiRef
-from src.core.secrets import has_secret, store_secret
+from src.core.secrets import get_secret, store_secret
 from src.core.storage import api_refs_repo
 
 
@@ -31,6 +31,8 @@ class ApiRefsView(BaseView):
         """
         super().__init__(page, "API References", ft.Icons.CODE_OUTLINED, self._open_add)
         self.conn = conn
+        self._current_filter_tag: str | None = None
+        self._revealed_keys: set[str] = set()
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -42,19 +44,11 @@ class ApiRefsView(BaseView):
         self._open_dialog(None)
 
     def _open_edit(self, ref: ApiRef) -> None:
-        """Buka dialog form edit api ref.
-
-        Args:
-            ref: ApiRef yang akan diedit.
-        """
+        """Buka dialog form edit api ref."""
         self._open_dialog(ref)
 
     def _open_dialog(self, ref: ApiRef | None) -> None:
-        """Tampilkan modal form tambah/edit.
-
-        Args:
-            ref: ApiRef untuk mode edit, atau None untuk mode tambah.
-        """
+        """Tampilkan modal form tambah/edit."""
         is_edit = ref is not None
         name_field = ft.TextField(
             label="Nama service",
@@ -97,6 +91,10 @@ class ApiRefsView(BaseView):
             can_reveal_password=True,
             dense=True,
         )
+        if is_edit and ref and ref.keychain_key_name:
+            existing_secret = get_secret(ref.keychain_key_name)
+            if existing_secret:
+                secret_field.value = existing_secret
         tags_field = ft.TextField(
             label="Tags (pisahkan dengan koma)",
             value=", ".join(ref.tags) if ref else "",
@@ -127,9 +125,15 @@ class ApiRefsView(BaseView):
                         tags=tags,
                     ),
                 )
-            # Simpan secret ke Keychain kalau diisi (bukan ke DB plaintext).
-            if keychain_name and secret_field.value:
-                store_secret(keychain_name, secret_field.value)
+            if keychain_name:
+                if secret_field.value:
+                    store_secret(keychain_name, secret_field.value)
+                else:
+                    from src.core.secrets import delete_secret
+                    try:
+                        delete_secret(keychain_name)
+                    except Exception:
+                        pass
             self.page.pop_dialog()
             self.refresh()
 
@@ -158,11 +162,7 @@ class ApiRefsView(BaseView):
         self.page.show_dialog(dialog)
 
     def _delete(self, ref: ApiRef) -> None:
-        """Hapus api ref (dengan konfirmasi).
-
-        Args:
-            ref: ApiRef yang akan dihapus.
-        """
+        """Hapus api ref (dengan konfirmasi)."""
 
         def _confirm(e: Any) -> None:
             api_refs_repo.delete_api_ref(self.conn, ref.id)  # type: ignore[arg-type]
@@ -185,6 +185,42 @@ class ApiRefsView(BaseView):
         self.page.show_dialog(dialog)
 
     # ------------------------------------------------------------------
+    # Filter & tag
+    # ------------------------------------------------------------------
+
+    def _chip_click(self, tag: str) -> None:
+        """Toggle filter by tag saat tag chip diklik."""
+        if self._current_filter_tag == tag:
+            self._current_filter_tag = None
+        else:
+            self._current_filter_tag = tag
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        """Terapkan filter berdasarkan tag yang sedang aktif."""
+        refs = api_refs_repo.list_api_refs(self.conn)
+        self.list_area.controls.clear()
+
+        if self._current_filter_tag:
+            filtered = [r for r in refs if self._current_filter_tag in r.tags]
+            if not filtered:
+                tag = self._current_filter_tag
+                msg = f"Tidak ada API dengan tag '{tag}'"
+                self.list_area.controls.append(self.empty_state(msg))
+            else:
+                for r in filtered:
+                    self.list_area.controls.append(self._item_card(r))
+        else:
+            if not refs:
+                self.list_area.controls.append(
+                    self.empty_state("Belum ada API reference. Tambahkan yang pertama!")
+                )
+            else:
+                for r in refs:
+                    self.list_area.controls.append(self._item_card(r))
+        self.page.update()
+
+    # ------------------------------------------------------------------
     # Render
     # ------------------------------------------------------------------
 
@@ -202,84 +238,112 @@ class ApiRefsView(BaseView):
                 self.list_area.controls.append(self._item_card(r))
         self.page.update()
 
+    def _reveal_secret(self, ref: ApiRef) -> str:
+        """Ambil secret dari Keychain, tampilkan atau sembunyikan."""
+        key = ref.keychain_key_name or ref.service_name
+        if key in self._revealed_keys:
+            self._revealed_keys.discard(key)
+            return ""
+        else:
+            self._revealed_keys.add(key)
+            val = get_secret(key)
+            return val or ""
+
     def _item_card(self, ref: ApiRef) -> ft.Container:
-        """Render satu kartu api ref.
+        """Render sederhana: service name, base URL, copy key button."""
+        secret_key = ref.keychain_key_name or ref.service_name
+        is_revealed = secret_key in self._revealed_keys
+        secret_value = get_secret(secret_key) if is_revealed else None
 
-        Args:
-            ref: ApiRef yang dirender.
-
-        Returns:
-            Container kartu api ref.
-        """
-        tag_chips: list[ft.Control] = [
-            ft.Container(
-                content=ft.Text(t, size=11, color=PALETTE["text.secondary"]),
-                bgcolor=PALETTE["bg.surface-hover"],
-                padding=ft.Padding.symmetric(horizontal=8, vertical=2),
-                border_radius=8,
-            )
-            for t in ref.tags
-        ]
-        # Indikator secret: hanya boolean, nilai secret tidak pernah dirender.
-        secret_indicator = self._secret_badge(ref)
-        return ft.Container(
-            content=ft.Row(
+        secret_display: ft.Control = ft.Container()
+        if secret_value:
+            secret_display = ft.Row(
                 [
-                    ft.Column(
+                    ft.Text(
+                        "API Key:",
+                        size=11,
+                        color=PALETTE["text.secondary"],
+                    ),
+                    ft.Text(
+                        secret_value,
+                        size=12,
+                        color=PALETTE["accent.mint"],
+                        style=ft.TextStyle(font_family="monospace"),
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                ],
+                spacing=4,
+            )
+
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Row(
                         [
-                            ft.Row(
-                                [
-                                    ft.Text(
-                                        ref.service_name,
-                                        size=16,
-                                        weight=ft.FontWeight.W_600,
-                                        color=PALETTE["text.primary"],
-                                    ),
-                                    secret_indicator,
-                                ],
-                                spacing=6,
-                            ),
                             ft.Text(
-                                ref.base_url,
-                                size=12,
-                                color=PALETTE["accent.mint"],
-                                style=ft.TextStyle(font_family="monospace"),
+                                ref.service_name,
+                                size=16,
+                                weight=ft.FontWeight.W_600,
+                                color=PALETTE["text.primary"],
                             ),
-                            ft.Row(
-                                [
-                                    ft.Container(
-                                        content=ft.Text(
-                                            ref.auth_type or "Tanpa auth",
-                                            size=11,
-                                            color=PALETTE["text.secondary"],
-                                        ),
-                                        bgcolor=PALETTE["bg.surface-hover"],
-                                        padding=ft.Padding.symmetric(
-                                            horizontal=6, vertical=2
-                                        ),
-                                        border_radius=6,
-                                    ),
-                                    *tag_chips,
-                                ],
-                                spacing=4,
+                            ft.Container(expand=True),
+                            _copy_btn(
+                                ft.Icons.CONTENT_COPY,
+                                f'API key "{ref.service_name}" disalin!',
+                                lambda: copy_to_clipboard(
+                                    self.page,
+                                    secret_value or ref.base_url or ref.service_name,
+                                    f'API key "{ref.service_name}" disalin!',
+                                ),
+                            ),
+                            _copy_btn(
+                                ft.Icons.KEY_OUTLINED,
+                                "Reveal key",
+                                lambda: self._toggle_reveal(ref),
+                            ),
+                            _action_button(
+                                ft.Icons.EDIT_OUTLINED,
+                                "Edit",
+                                lambda e, r=ref: self._open_edit(r),
+                            ),
+                            _action_button(
+                                ft.Icons.DELETE_OUTLINE,
+                                "Hapus",
+                                lambda e, r=ref: self._delete(r),
+                                danger=True,
                             ),
                         ],
                         spacing=4,
-                        expand=True,
                     ),
-                    _action_button(
-                        ft.Icons.EDIT_OUTLINED,
-                        "Edit",
-                        lambda e, r=ref: self._open_edit(r),
+                    ft.Text(
+                        ref.base_url,
+                        size=12,
+                        color=PALETTE["accent.mint"],
+                        style=ft.TextStyle(font_family="monospace"),
                     ),
-                    _action_button(
-                        ft.Icons.DELETE_OUTLINE,
-                        "Hapus",
-                        lambda e, r=ref: self._delete(r),
-                        danger=True,
+                    secret_display,
+                    ft.Row(
+                        [
+                            ft.Container(
+                                content=ft.Text(
+                                    ref.auth_type or "Tanpa auth",
+                                    size=11,
+                                    color=PALETTE["text.secondary"],
+                                ),
+                                bgcolor=PALETTE["bg.surface-hover"],
+                                padding=ft.Padding.symmetric(
+                                    horizontal=6, vertical=2
+                                ),
+                                border_radius=6,
+                            ),
+                            *[self._tag_chip(t) for t in ref.tags],
+                        ],
+                        spacing=4,
+                        alignment=ft.MainAxisAlignment.START,
                     ),
                 ],
-                spacing=8,
+                spacing=4,
             ),
             bgcolor=PALETTE["bg.surface"],
             border=ft.Border.all(1, PALETTE["border.subtle"]),
@@ -287,42 +351,48 @@ class ApiRefsView(BaseView):
             padding=12,
         )
 
-    def _secret_badge(self, ref: ApiRef) -> ft.Container:
-        """Badge status secret di Keychain (tanpa nilai).
+    def _toggle_reveal(self, ref: ApiRef) -> None:
+        """Toggle reveal state dan refresh."""
+        secret_key = ref.keychain_key_name or ref.service_name
+        if secret_key in self._revealed_keys:
+            self._revealed_keys.discard(secret_key)
+        else:
+            self._revealed_keys.add(secret_key)
+        self.page.update()
 
-        Args:
-            ref: ApiRef yang dicek.
-
-        Returns:
-            Container badge hijau (terisi) atau abu/kuning (belum).
-        """
-        if not ref.keychain_key_name:
-            return ft.Container()
-        filled = has_secret(ref.keychain_key_name)
-        color = PALETTE["state.success"] if filled else PALETTE["state.warning"]
-        text = "secret ✓" if filled else "secret belum diisi"
+    def _tag_chip(self, tag: str) -> ft.Container:
+        """Buat tag chip yang bisa diklik untuk filter."""
+        is_active = self._current_filter_tag == tag
+        accent = PALETTE["accent.primary"]
+        surface = PALETTE["bg.surface-hover"]
+        base = PALETTE["bg.base"]
+        secondary = PALETTE["text.secondary"]
+        chip_bg = accent if is_active else surface
+        chip_fg = base if is_active else secondary
         return ft.Container(
-            content=ft.Text(text, size=11, color=color),
-            border=ft.Border.all(1, color),
-            padding=ft.Padding.symmetric(horizontal=6, vertical=1),
-            border_radius=6,
+            content=ft.Text(tag, size=11, color=chip_fg),
+            bgcolor=chip_bg,
+            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
+            border_radius=8,
+            on_click=lambda e, t=tag: self._chip_click(t),
+            ink=True,
         )
+
+
+def _copy_btn(icon: Any, tooltip: str, on_click: Any) -> ft.IconButton:
+    """Tombol salin/reveal kecil dengan warna hijau."""
+    return ft.IconButton(
+        icon=icon,
+        icon_color=PALETTE["state.success"],
+        tooltip=tooltip,
+        on_click=on_click,
+    )
 
 
 def _action_button(
     icon: Any, tooltip: str, on_click: Any, danger: bool = False
 ) -> ft.IconButton:
-    """Buat tombol aksi ikon kecil.
-
-    Args:
-        icon: ikon Flet.
-        tooltip: tooltip tombol.
-        on_click: callback saat diklik.
-        danger: True untuk style merah.
-
-    Returns:
-        IconButton.
-    """
+    """Buat tombol aksi ikon kecil."""
     return ft.IconButton(
         icon=icon,
         icon_color=PALETTE["state.danger"] if danger else PALETTE["text.secondary"],

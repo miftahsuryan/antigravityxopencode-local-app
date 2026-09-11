@@ -10,7 +10,7 @@ import sqlite3
 from pathlib import Path
 
 # Versi skema saat ini — naikkan setiap kali ada perubahan DDL.
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 # Lokasi DB mengikuti konvensi macOS: ~/Library/Application Support/DevCodex/.
 # Sesuai .agents/rules/security-and-data.md — data pribadi TIDAK disimpan di
@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS notes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     title       TEXT    NOT NULL,
     file_path   TEXT    NOT NULL UNIQUE,
+    content     TEXT    NOT NULL DEFAULT '',
     tags        TEXT    NOT NULL DEFAULT '[]',
     folder      TEXT    NOT NULL DEFAULT '',
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
@@ -96,6 +97,16 @@ CREATE TABLE IF NOT EXISTS api_refs (
 """
 
 
+_MIGRATION_V2 = """\
+ALTER TABLE notes ADD COLUMN content TEXT NOT NULL DEFAULT '';
+"""
+
+
+_MIGRATION_V2 = """\
+ALTER TABLE notes ADD COLUMN content TEXT NOT NULL DEFAULT '';
+"""
+
+
 def run_migrations(conn: sqlite3.Connection) -> None:
     """Jalankan migrasi skema yang belum diaplikasikan.
 
@@ -106,6 +117,10 @@ def run_migrations(conn: sqlite3.Connection) -> None:
 
     if current_version < 1:
         conn.executescript(_MIGRATION_V1)
+        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+        conn.commit()
+    elif current_version < 2:
+        conn.executescript(_MIGRATION_V2)
         conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
         conn.commit()
 

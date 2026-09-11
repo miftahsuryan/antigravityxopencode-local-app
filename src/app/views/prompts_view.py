@@ -15,6 +15,7 @@ from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import Prompt
 from src.core.storage import prompts_repo
+from src.core.storage import projects_repo
 
 
 class PromptsView(BaseView):
@@ -80,11 +81,18 @@ class PromptsView(BaseView):
 
         def _save(e: Any) -> None:
             tags = [t.strip() for t in (tags_field.value or "").split(",") if t.strip()]
+            pid = project_field.value if project_field else None
+            if pid and pid != "":
+                try:
+                    pid = int(pid)
+                except ValueError:
+                    pid = None
             if is_edit and prompt:
                 prompt.title = (title_field.value or "").strip()
                 prompt.content = content_field.value or ""
                 prompt.tool = (tool_field.value or "").strip()
                 prompt.tags = tags
+                prompt.project_id = pid
                 prompts_repo.update_prompt(self.conn, prompt)
             else:
                 prompts_repo.create_prompt(
@@ -95,16 +103,30 @@ class PromptsView(BaseView):
                         content=content_field.value or "",
                         tool=(tool_field.value or "").strip(),
                         tags=tags,
+                        project_id=pid,
                     ),
                 )
             self.page.pop_dialog()
             self.refresh()
 
+        project_options = [ft.dropdown.Option("")]
+        projects = projects_repo.list_projects(self.conn)
+        for p in projects:
+            project_options.append(ft.dropdown.Option(str(p.id), p.name))
+
+        project_field = ft.Dropdown(
+            label="Project",
+            options=project_options,
+            dense=True,
+        )
+        if is_edit and prompt and prompt.project_id:
+            project_field.value = str(prompt.project_id)
+
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Edit Prompt" if is_edit else "Tambah Prompt"),
             content=ft.Column(
-                [title_field, content_field, tool_field, tags_field],
+                [title_field, project_field, content_field, tool_field, tags_field],
                 spacing=8,
                 tight=True,
                 scroll=ft.ScrollMode.AUTO,
@@ -297,6 +319,7 @@ class PromptsView(BaseView):
                         padding=ft.Padding.symmetric(horizontal=6, vertical=2),
                         border_radius=6,
                     ),
+                    self._project_badge(prompt),
                 ],
                 spacing=4,
             ),
@@ -304,6 +327,20 @@ class PromptsView(BaseView):
             border=ft.Border.all(1, PALETTE["border.subtle"]),
             border_radius=8,
             padding=12,
+        )
+
+    def _project_badge(self, prompt: Prompt) -> ft.Container:
+        if not prompt.project_id:
+            return ft.Container()
+        return ft.Container(
+            content=ft.Text(
+                f"Project {prompt.project_id}",
+                size=11,
+                color=PALETTE["accent.primary"],
+            ),
+            bgcolor=PALETTE["bg.surface-hover"],
+            padding=ft.Padding.symmetric(horizontal=6, vertical=2),
+            border_radius=6,
         )
 
     def _tag_chip(self, tag: str) -> ft.Container:

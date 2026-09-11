@@ -36,7 +36,7 @@ class BaseView:
         self.title = title
         self.icon = icon
         self.on_add = on_add
-        self.list_area = ft.Column(spacing=8)
+        self.list_area = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def header(self) -> ft.Row:
         """Buat baris header: judul + tombol tambah.
@@ -107,6 +107,7 @@ class BaseView:
                     self.list_area,
                 ],
                 spacing=12,
+                expand=True,
             ),
             padding=24,
             expand=True,

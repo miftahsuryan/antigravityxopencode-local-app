@@ -17,6 +17,7 @@ from src.app.views.base import BaseView
 from src.core.models import ApiRef
 from src.core.secrets import get_secret, store_secret
 from src.core.storage import api_refs_repo
+from src.core.storage import projects_repo
 
 
 class ApiRefsView(BaseView):
@@ -103,6 +104,12 @@ class ApiRefsView(BaseView):
         def _save(e: Any) -> None:
             tags = [t.strip() for t in (tags_field.value or "").split(",") if t.strip()]
             keychain_name = (keychain_field.value or "").strip()
+            pid = None
+            if project_field.value and project_field.value != "":
+                try:
+                    pid = int(project_field.value)
+                except ValueError:
+                    pid = None
             if is_edit and ref:
                 ref.service_name = (name_field.value or "").strip()
                 ref.base_url = (url_field.value or "").strip()
@@ -110,6 +117,7 @@ class ApiRefsView(BaseView):
                 ref.auth_type = auth_field.value or ""
                 ref.keychain_key_name = keychain_name
                 ref.tags = tags
+                ref.project_id = pid
                 api_refs_repo.update_api_ref(self.conn, ref)
             else:
                 api_refs_repo.create_api_ref(
@@ -122,6 +130,7 @@ class ApiRefsView(BaseView):
                         auth_type=auth_field.value or "",
                         keychain_key_name=keychain_name,
                         tags=tags,
+                        project_id=pid,
                     ),
                 )
             if keychain_name:
@@ -136,6 +145,19 @@ class ApiRefsView(BaseView):
             self.page.pop_dialog()
             self.refresh()
 
+        project_options = [ft.dropdown.Option("")]
+        projects = projects_repo.list_projects(self.conn)
+        for p in projects:
+            project_options.append(ft.dropdown.Option(str(p.id), p.name))
+
+        project_field = ft.Dropdown(
+            label="Project",
+            options=project_options,
+            dense=True,
+        )
+        if is_edit and ref and ref.project_id:
+            project_field.value = str(ref.project_id)
+
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Edit API Reference" if is_edit else "Tambah API Reference"),
@@ -148,6 +170,7 @@ class ApiRefsView(BaseView):
                     keychain_field,
                     secret_field,
                     tags_field,
+                    project_field,
                 ],
                 spacing=8,
                 tight=True,

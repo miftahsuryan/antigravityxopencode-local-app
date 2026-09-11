@@ -16,6 +16,7 @@ from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import Command
 from src.core.storage import commands_repo
+from src.core.storage import projects_repo
 
 
 class CommandsView(BaseView):
@@ -80,11 +81,18 @@ class CommandsView(BaseView):
 
         def _save(e: Any) -> None:
             tags = [t.strip() for t in (tags_field.value or "").split(",") if t.strip()]
+            pid = None
+            if project_field.value and project_field.value != "":
+                try:
+                    pid = int(project_field.value)
+                except ValueError:
+                    pid = None
             if is_edit and cmd:
                 cmd.title = (title_field.value or "").strip()
                 cmd.command_text = (command_field.value or "").strip()
                 cmd.description = desc_field.value or ""
                 cmd.tags = tags
+                cmd.project_id = pid
                 commands_repo.update_command(self.conn, cmd)
             else:
                 commands_repo.create_command(
@@ -95,18 +103,33 @@ class CommandsView(BaseView):
                         command_text=(command_field.value or "").strip(),
                         description=desc_field.value or "",
                         tags=tags,
+                        project_id=pid,
                     ),
                 )
             self.page.pop_dialog()
             self.refresh()
 
+        project_options = [ft.dropdown.Option("")]
+        projects = projects_repo.list_projects(self.conn)
+        for p in projects:
+            project_options.append(ft.dropdown.Option(str(p.id), p.name))
+
+        project_field = ft.Dropdown(
+            label="Project",
+            options=project_options,
+            dense=True,
+        )
+        if is_edit and cmd and cmd.project_id:
+            project_field.value = str(cmd.project_id)
+
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Edit Command" if is_edit else "Tambah Command"),
             content=ft.Column(
-                [title_field, command_field, desc_field, tags_field],
+                [title_field, project_field, command_field, desc_field, tags_field],
                 spacing=8,
                 tight=True,
+                scroll=ft.ScrollMode.AUTO,
             ),
             actions=[
                 ft.TextButton("Batal", on_click=lambda e: self.page.pop_dialog()),

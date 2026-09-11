@@ -10,32 +10,26 @@ from src.core.models import Command
 
 
 def _row_to_command(row: sqlite3.Row) -> Command:
-    """Konversi sqlite3.Row menjadi dataclass Command."""
     return Command(
         id=row["id"],
         title=row["title"],
         command_text=row["command_text"],
         description=row["description"],
         tags=json.loads(row["tags"]),
+        project_id=row["project_id"],
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
     )
 
 
 def create_command(conn: sqlite3.Connection, cmd: Command) -> Command:
-    """Simpan command baru ke DB.
-
-    Args:
-        conn: koneksi SQLite.
-        cmd: instance Command (id boleh None).
-
-    Returns:
-        Command dengan id yang sudah terisi.
-    """
     cur = conn.execute(
-        """INSERT INTO commands (title, command_text, description, tags)
-           VALUES (?, ?, ?, ?)""",
-        (cmd.title, cmd.command_text, cmd.description, json.dumps(cmd.tags)),
+        "INSERT INTO commands (title, command_text, description, tags, project_id) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            cmd.title, cmd.command_text, cmd.description,
+            json.dumps(cmd.tags), cmd.project_id,
+        ),
     )
     conn.commit()
     return _row_to_command(
@@ -44,69 +38,45 @@ def create_command(conn: sqlite3.Connection, cmd: Command) -> Command:
 
 
 def list_commands(conn: sqlite3.Connection) -> list[Command]:
-    """Ambil semua command, urut terbaru dulu.
-
-    Args:
-        conn: koneksi SQLite.
-
-    Returns:
-        Daftar Command.
-    """
     rows = conn.execute("SELECT * FROM commands ORDER BY updated_at DESC").fetchall()
     return [_row_to_command(r) for r in rows]
 
 
+def list_commands_by_project(
+    conn: sqlite3.Connection, project_id: int
+) -> list[Command]:
+    rows = conn.execute(
+        "SELECT * FROM commands WHERE project_id = ? ORDER BY updated_at DESC",
+        (project_id,),
+    ).fetchall()
+    return [_row_to_command(r) for r in rows]
+
+
 def get_command(conn: sqlite3.Connection, cmd_id: int) -> Command | None:
-    """Ambil satu command berdasarkan ID.
-
-    Args:
-        conn: koneksi SQLite.
-        cmd_id: primary key.
-
-    Returns:
-        Command atau None kalau tidak ditemukan.
-    """
     row = conn.execute("SELECT * FROM commands WHERE id = ?", (cmd_id,)).fetchone()
     return _row_to_command(row) if row else None
 
 
 def update_command(conn: sqlite3.Connection, cmd: Command) -> Command | None:
-    """Update command yang sudah ada.
-
-    Args:
-        conn: koneksi SQLite.
-        cmd: instance Command dengan id terisi.
-
-    Returns:
-        Command yang sudah di-update, atau None kalau id tidak ditemukan.
-    """
     conn.execute(
         """UPDATE commands
            SET title = ?, command_text = ?, description = ?, tags = ?,
-               updated_at = strftime('%Y-%m-%dT%H:%M:%S','now')
-         WHERE id = ?""",
+               project_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now')
+           WHERE id = ?""",
         (
             cmd.title,
             cmd.command_text,
             cmd.description,
             json.dumps(cmd.tags),
+            cmd.project_id,
             cmd.id,
         ),
     )
     conn.commit()
-    return get_command(conn, cmd.id)  # type: ignore[arg-type]
+    return get_command(conn, cmd.id)
 
 
 def delete_command(conn: sqlite3.Connection, cmd_id: int) -> bool:
-    """Hapus command berdasarkan ID.
-
-    Args:
-        conn: koneksi SQLite.
-        cmd_id: primary key.
-
-    Returns:
-        True kalau berhasil dihapus, False kalau tidak ditemukan.
-    """
     cur = conn.execute("DELETE FROM commands WHERE id = ?", (cmd_id,))
     conn.commit()
     return cur.rowcount > 0

@@ -15,7 +15,7 @@ from src.app.theme import PALETTE
 
 # Urutan & metadata navigasi modul.
 MODULES: list[tuple[str, str, Any]] = [
-    ("notes", "Notes", ft.Icons.DESCRIPTION_OUTLINED),
+    ("projects", "Projects", ft.Icons.FOLDER_OUTLINED),
     ("prompts", "Prompts", ft.Icons.AUTO_AWESOME_OUTLINED),
     ("commands", "Commands", ft.Icons.TERMINAL_OUTLINED),
     ("api_refs", "API References", ft.Icons.CODE_OUTLINED),
@@ -41,7 +41,7 @@ class Sidebar:
         self.page = page
         self.on_navigate = on_navigate
         self.on_search = on_search
-        self.active_key: str = "notes"
+        self.active_key: str = "projects"
         # Simpan referensi tombol per modul untuk styling aktif.
         self._buttons: dict[str, ft.Container] = {}
         self._build()

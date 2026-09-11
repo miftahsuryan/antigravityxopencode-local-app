@@ -1,8 +1,4 @@
-"""Search global lintas 4 modul inti.
-
-Implementasi awal menggunakan LIKE-based query.
-Bisa di-upgrade ke FTS5 kalau data sudah besar.
-"""
+"""Search global lintas modul inti."""
 
 from __future__ import annotations
 
@@ -12,9 +8,7 @@ from dataclasses import dataclass
 
 @dataclass
 class SearchResult:
-    """Satu baris hasil search global."""
-
-    module: str  # "notes" | "prompts" | "commands" | "api_refs"
+    module: str
     item_id: int
     title: str
     snippet: str
@@ -23,46 +17,35 @@ class SearchResult:
 def search_all(
     conn: sqlite3.Connection, query: str, limit: int = 50
 ) -> list[SearchResult]:
-    """Cari di semua tabel berdasarkan keyword (LIKE).
-
-    Args:
-        conn: koneksi SQLite.
-        query: kata kunci pencarian.
-        limit: jumlah maksimum hasil per modul.
-
-    Returns:
-        Daftar SearchResult gabungan dari semua modul, diurutkan per modul.
-    """
     if not query or not query.strip():
         return []
 
     pattern = f"%{query.strip()}%"
     results: list[SearchResult] = []
 
-    # Notes
+    # Projects
     rows = conn.execute(
-        """SELECT id, title, file_path, content FROM notes
-           WHERE title LIKE ? OR tags LIKE ? OR folder LIKE ? OR content LIKE ?
+        """SELECT id, name, description FROM projects
+           WHERE name LIKE ? OR description LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
-        (pattern, pattern, pattern, pattern, limit),
+        (pattern, pattern, limit),
     ).fetchall()
     for r in rows:
-        # Show content preview if title matches file_path
-        snippet = r["content"][:80] + "..." if len(r["content"]) > 80 else r["content"]
         results.append(
             SearchResult(
-                module="notes",
+                module="projects",
                 item_id=r["id"],
-                title=r["title"],
-                snippet=snippet,
+                title=r["name"],
+                snippet=r["description"][:80] if r["description"] else "",
             )
         )
 
     # Prompts
     rows = conn.execute(
-        """SELECT id, title, content FROM prompts
-           WHERE title LIKE ? OR content LIKE ? OR tool LIKE ? OR tags LIKE ?
-           ORDER BY updated_at DESC LIMIT ?""",
+        """SELECT p.id, p.title, p.content
+           FROM prompts p
+           WHERE p.title LIKE ? OR p.content LIKE ? OR p.tool LIKE ? OR p.tags LIKE ?
+           ORDER BY p.updated_at DESC LIMIT ?""",
         (pattern, pattern, pattern, pattern, limit),
     ).fetchall()
     for r in rows:
@@ -79,8 +62,8 @@ def search_all(
     # Commands
     rows = conn.execute(
         """SELECT id, title, command_text FROM commands
-           WHERE title LIKE ? OR command_text LIKE ? OR description LIKE ?
-                 OR tags LIKE ?
+           WHERE title LIKE ? OR command_text LIKE ?
+           OR description LIKE ? OR tags LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
         (pattern, pattern, pattern, pattern, limit),
     ).fetchall()
@@ -97,8 +80,8 @@ def search_all(
     # API References
     rows = conn.execute(
         """SELECT id, service_name, base_url FROM api_refs
-           WHERE service_name LIKE ? OR base_url LIKE ? OR description LIKE ?
-                 OR tags LIKE ?
+           WHERE service_name LIKE ? OR base_url LIKE ?
+           OR description LIKE ? OR tags LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
         (pattern, pattern, pattern, pattern, limit),
     ).fetchall()

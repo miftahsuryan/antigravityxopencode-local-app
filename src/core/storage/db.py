@@ -1,42 +1,21 @@
-"""Koneksi SQLite dan migrasi skema.
-
-Menggunakan ``PRAGMA user_version`` untuk tracking versi migrasi.
-Semua tabel dibuat di sini; lihat docs/paper-trail/0001-mvp-core-modules.md.
-"""
+"""Koneksi SQLite dan migrasi skema."""
 
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 
-# Versi skema saat ini — naikkan setiap kali ada perubahan DDL.
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
-# Lokasi DB mengikuti konvensi macOS: ~/Library/Application Support/DevCodex/.
-# Sesuai .agents/rules/security-and-data.md — data pribadi TIDAK disimpan di
-# dalam folder repo Git; folder data/ di repo hanya untuk sample dev.
 _APP_SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "DevCodex"
 
 
 def _default_db_path() -> Path:
-    """Tentukan path DB di Application Support macOS.
-
-    Returns:
-        Path absolut ke file database.
-    """
     _APP_SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
     return _APP_SUPPORT_DIR / "devcodex.db"
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
-    """Buat atau ambil koneksi ke SQLite.
-
-    Args:
-        db_path: path opsional ke file DB.  Kalau None, pakai default.
-
-    Returns:
-        Koneksi SQLite dengan row_factory = sqlite3.Row.
-    """
     path = db_path or _default_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
@@ -46,18 +25,11 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
-# ---------------------------------------------------------------------------
-# Migrasi
-# ---------------------------------------------------------------------------
-
 _MIGRATION_V1 = """\
-CREATE TABLE IF NOT EXISTS notes (
+CREATE TABLE IF NOT EXISTS projects (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    title       TEXT    NOT NULL,
-    file_path   TEXT    NOT NULL UNIQUE,
-    content     TEXT    NOT NULL DEFAULT '',
-    tags        TEXT    NOT NULL DEFAULT '[]',
-    folder      TEXT    NOT NULL DEFAULT '',
+    name        TEXT    NOT NULL,
+    description TEXT    NOT NULL DEFAULT '',
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
     updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now'))
 );
@@ -69,8 +41,10 @@ CREATE TABLE IF NOT EXISTS prompts (
     tool        TEXT    NOT NULL DEFAULT '',
     tags        TEXT    NOT NULL DEFAULT '[]',
     is_favorite INTEGER NOT NULL DEFAULT 0,
+    project_id  INTEGER DEFAULT NULL,
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
-    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now'))
+    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
 CREATE TABLE IF NOT EXISTS commands (
@@ -79,8 +53,10 @@ CREATE TABLE IF NOT EXISTS commands (
     command_text  TEXT    NOT NULL DEFAULT '',
     description   TEXT    NOT NULL DEFAULT '',
     tags          TEXT    NOT NULL DEFAULT '[]',
+    project_id    INTEGER DEFAULT NULL,
     created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
-    updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now'))
+    updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
 CREATE TABLE IF NOT EXISTS api_refs (
@@ -91,28 +67,26 @@ CREATE TABLE IF NOT EXISTS api_refs (
     auth_type         TEXT    NOT NULL DEFAULT '',
     keychain_key_name TEXT    NOT NULL DEFAULT '',
     tags              TEXT    NOT NULL DEFAULT '[]',
+    project_id        INTEGER DEFAULT NULL,
     created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
-    updated_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now'))
+    updated_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 """
 
-
 _MIGRATION_V2 = """\
 ALTER TABLE notes ADD COLUMN content TEXT NOT NULL DEFAULT '';
 """
 
-
-_MIGRATION_V2 = """\
-ALTER TABLE notes ADD COLUMN content TEXT NOT NULL DEFAULT '';
+_MIGRATION_V3 = """\
+-- Tambahkan project_id ke tabel yang sudah ada jika belum ada
+ALTER TABLE prompts ADD COLUMN project_id INTEGER DEFAULT NULL;
+ALTER TABLE commands ADD COLUMN project_id INTEGER DEFAULT NULL;
+ALTER TABLE api_refs ADD COLUMN project_id INTEGER DEFAULT NULL;
 """
 
 
 def run_migrations(conn: sqlite3.Connection) -> None:
-    """Jalankan migrasi skema yang belum diaplikasikan.
-
-    Args:
-        conn: koneksi SQLite yang sudah terbuka.
-    """
     (current_version,) = conn.execute("PRAGMA user_version").fetchone()
 
     if current_version < 1:
@@ -123,17 +97,16 @@ def run_migrations(conn: sqlite3.Connection) -> None:
         conn.executescript(_MIGRATION_V2)
         conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
         conn.commit()
+    elif current_version < 3:
+        try:
+            conn.executescript(_MIGRATION_V3)
+        except sqlite3.OperationalError:
+            pass
+        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+        conn.commit()
 
 
 def init_db(db_path: Path | None = None) -> sqlite3.Connection:
-    """Helper: buat koneksi + jalankan migrasi sekaligus.
-
-    Args:
-        db_path: path opsional ke file DB.
-
-    Returns:
-        Koneksi SQLite yang sudah siap pakai.
-    """
     conn = get_connection(db_path)
     run_migrations(conn)
     return conn

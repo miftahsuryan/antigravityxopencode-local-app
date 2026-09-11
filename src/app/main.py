@@ -1,7 +1,7 @@
 """Entry point aplikasi DevCodex.
 
 Merakit layout utama: sidebar (navigasi + search) di kiri dan area konten
-di kanan.  Menangani routing antar 4 modul dan tampilan hasil search global.
+di kanan.  Menangani routing antar modul dan tampilan hasil search global.
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from src.app.theme import PALETTE
 from src.app.views.api_refs_view import ApiRefsView
 from src.app.views.base import BaseView
 from src.app.views.commands_view import CommandsView
-from src.app.views.notes_view import NotesView
 from src.app.views.prompts_view import PromptsView
+from src.app.views.projects_view import ProjectsView
 from src.core.search import SearchResult, search_all
 from src.core.storage.db import init_db
 
@@ -25,17 +25,11 @@ class DevCodexApp:
     """Orkestrator utama aplikasi DevCodex."""
 
     def __init__(self, page: ft.Page) -> None:
-        """Inisialisasi aplikasi.
-
-        Args:
-            page: objek Page Flet dari runtime.
-        """
         self.page = page
         self.conn: sqlite3.Connection = init_db()
 
-        # Buat view untuk tiap modul.
         self.views: dict[str, BaseView] = {
-            "notes": NotesView(page, self.conn),
+            "projects": ProjectsView(page, self.conn),
             "prompts": PromptsView(page, self.conn),
             "commands": CommandsView(page, self.conn),
             "api_refs": ApiRefsView(page, self.conn),
@@ -43,9 +37,8 @@ class DevCodexApp:
         self.content_area = ft.Container(expand=True)
 
         self.sidebar = Sidebar(page, self._navigate, self._search)
-        self.current_key: str = "notes"
+        self.current_key: str = "projects"
 
-        # Siapkan layout utama.
         self.page.title = "DevCodex"
         self.page.bgcolor = PALETTE["bg.base"]
         self.page.theme_mode = ft.ThemeMode.DARK
@@ -63,30 +56,18 @@ class DevCodexApp:
             )
         )
 
-        self._navigate("notes")
+        self._navigate("projects")
 
     def _navigate(self, key: str) -> None:
-        """Tampilkan view sesuai modul yang dipilih di sidebar.
-
-        Args:
-            key: key modul ("notes"/"prompts"/"commands"/"api_refs").
-        """
         self.current_key = key
         self.sidebar.set_active(key)
         view = self.views[key]
-        # Pastikan tiap masuk ke view, data direfresh dari DB.
         view.refresh()
         self.content_area.content = view.build()
         self.page.update()
 
     def _search(self, query: str) -> None:
-        """Tampilkan hasil pencarian global saat query berubah.
-
-        Args:
-            query: kata kunci pencarian (string).
-        """
         if not query or not query.strip():
-            # Kembali ke view aktif.
             self._navigate(self.current_key)
             return
 
@@ -96,15 +77,6 @@ class DevCodexApp:
         self.page.update()
 
     def _render_results(self, query: str, results: list[SearchResult]) -> ft.Container:
-        """Render panel hasil pencarian.
-
-        Args:
-            query: kata kunci pencarian.
-            results: daftar SearchResult.
-
-        Returns:
-            Container berisi hasil pencarian.
-        """
         rows: list[ft.Control] = [
             ft.Text(
                 f'Hasil untuk "{query}"',
@@ -137,17 +109,8 @@ class DevCodexApp:
         )
 
     def _result_item(self, r: SearchResult, query: str) -> ft.Container:
-        """Render satu baris hasil pencarian.
-
-        Args:
-            r: SearchResult.
-            query: kata kunci pencarian.
-
-        Returns:
-            Container baris hasil.
-        """
         module_label = {
-            "notes": "Notes",
+            "projects": "Projects",
             "prompts": "Prompts",
             "commands": "Commands",
             "api_refs": "API",
@@ -193,22 +156,10 @@ class DevCodexApp:
         )
 
     def _open_result(self, module: str, item_id: int) -> None:
-        """Buka modul terkait hasil pencarian.
-
-        Args:
-            module: modul dari hasil (notes/prompts/commands/api_refs).
-            item_id: ID item untuk highlight (digunakan di versi lanjutan).
-        """
-        # Untuk MVP: arahkan ke modul yang relevan.
         self._navigate(module)
 
 
 def main(page: ft.Page) -> None:
-    """Setup halaman utama Flet.
-
-    Args:
-        page: instance Page dari Flet, disuntik otomatis oleh runtime.
-    """
     DevCodexApp(page)
 
 

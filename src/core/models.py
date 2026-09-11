@@ -1,8 +1,4 @@
-"""Dataclass model untuk entity inti DevCodex.
-
-Implementasi lengkap dibangun mengikuti
-docs/paper-trail/0001-mvp-core-modules.md.
-"""
+"""Dataclass model untuk entity inti DevCodex."""
 
 from __future__ import annotations
 
@@ -11,13 +7,10 @@ from datetime import datetime
 
 
 @dataclass
-class Note:
+class Project:
     id: int | None
-    title: str
-    file_path: str
-    content: str = ""
-    tags: list[str] = field(default_factory=list)
-    folder: str = ""
+    name: str
+    description: str = ""
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -30,6 +23,7 @@ class Prompt:
     tool: str = ""
     tags: list[str] = field(default_factory=list)
     is_favorite: bool = False
+    project_id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -41,6 +35,7 @@ class Command:
     command_text: str
     description: str = ""
     tags: list[str] = field(default_factory=list)
+    project_id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -54,5 +49,6 @@ class ApiRef:
     auth_type: str = ""
     keychain_key_name: str = ""
     tags: list[str] = field(default_factory=list)
+    project_id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

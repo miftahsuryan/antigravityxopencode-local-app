@@ -16,8 +16,7 @@ from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import ApiRef
 from src.core.secrets import get_secret, store_secret
-from src.core.storage import api_refs_repo
-from src.core.storage import projects_repo
+from src.core.storage import api_refs_repo, projects_repo
 
 
 class ApiRefsView(BaseView):
@@ -104,10 +103,11 @@ class ApiRefsView(BaseView):
         def _save(e: Any) -> None:
             tags = [t.strip() for t in (tags_field.value or "").split(",") if t.strip()]
             keychain_name = (keychain_field.value or "").strip()
-            pid = None
-            if project_field.value and project_field.value != "":
+            pid: int | None = None
+            raw_pid = project_field.value if project_field else None
+            if raw_pid and raw_pid != "":
                 try:
-                    pid = int(project_field.value)
+                    pid = int(raw_pid)
                 except ValueError:
                     pid = None
             if is_edit and ref:

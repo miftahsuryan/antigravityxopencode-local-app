@@ -73,7 +73,7 @@ def update_command(conn: sqlite3.Connection, cmd: Command) -> Command | None:
         ),
     )
     conn.commit()
-    return get_command(conn, cmd.id)
+    return get_command(conn, cmd.id)  # type: ignore[arg-type]
 
 
 def delete_command(conn: sqlite3.Connection, cmd_id: int) -> bool:

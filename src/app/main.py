@@ -15,8 +15,8 @@ from src.app.theme import PALETTE
 from src.app.views.api_refs_view import ApiRefsView
 from src.app.views.base import BaseView
 from src.app.views.commands_view import CommandsView
-from src.app.views.prompts_view import PromptsView
 from src.app.views.projects_view import ProjectsView
+from src.app.views.prompts_view import PromptsView
 from src.core.search import SearchResult, search_all
 from src.core.storage.db import init_db
 

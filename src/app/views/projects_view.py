@@ -54,7 +54,7 @@ class ProjectsView(BaseView):
                     self.conn,
                     Project(
                         id=None,
-                        title=(name_field.value or "").strip(),
+                        name=(name_field.value or "").strip(),
                         description=(desc_field.value or "").strip(),
                     ),
                 )
@@ -79,7 +79,7 @@ class ProjectsView(BaseView):
 
     def _delete(self, project: Project) -> None:
         def _confirm(e: Any) -> None:
-            projects_repo.delete_project(self.conn, project.id)
+            projects_repo.delete_project(self.conn, project.id)  # type: ignore[arg-type]
             self.page.pop_dialog()
             self.refresh()
 

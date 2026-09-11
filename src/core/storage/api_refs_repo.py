@@ -83,7 +83,7 @@ def update_api_ref(conn: sqlite3.Connection, ref: ApiRef) -> ApiRef | None:
         ),
     )
     conn.commit()
-    return get_api_ref(conn, ref.id)
+    return get_api_ref(conn, ref.id)  # type: ignore[arg-type]
 
 
 def delete_api_ref(conn: sqlite3.Connection, ref_id: int) -> bool:

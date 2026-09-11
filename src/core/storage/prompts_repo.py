@@ -77,7 +77,7 @@ def update_prompt(conn: sqlite3.Connection, prompt: Prompt) -> Prompt | None:
         ),
     )
     conn.commit()
-    return get_prompt(conn, prompt.id)
+    return get_prompt(conn, prompt.id)  # type: ignore[arg-type]
 
 
 def delete_prompt(conn: sqlite3.Connection, prompt_id: int) -> bool:

@@ -48,7 +48,7 @@ def update_project(conn: sqlite3.Connection, project: Project) -> Project | None
         (project.name, project.description, project.id),
     )
     conn.commit()
-    return get_project(conn, project.id)
+    return get_project(conn, project.id)  # type: ignore[arg-type]
 
 
 def delete_project(conn: sqlite3.Connection, project_id: int) -> bool:

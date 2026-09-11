@@ -29,6 +29,25 @@ class ApiRefsView(BaseView):
     def _open_edit(self, ref: ApiRef) -> None:
         self._open_dialog(ref)
 
+    def _duplicate(self, ref: ApiRef) -> None:
+        api_refs_repo.create_api_ref(
+            self.conn,
+            ApiRef(
+                id=None,
+                service_name=f"{ref.service_name} (copy)",
+                base_url=ref.base_url,
+                description=ref.description,
+                auth_type=ref.auth_type,
+                keychain_key_name="",
+                label_ids=[
+                    lb.id for lb in labels_repo.get_labels_for_item(
+                        self.conn, "api_refs", ref.id  # type: ignore[arg-type]
+                    ) if lb.id is not None
+                ],
+            ),
+        )
+        self.refresh()
+
     def _open_dialog(self, ref: ApiRef | None) -> None:
         is_edit = ref is not None
         name_field = ft.TextField(
@@ -89,7 +108,7 @@ class ApiRefsView(BaseView):
                 )
             )
         label_section = ft.Column(
-            label_checks, spacing=2, scroll=ft.ScrollMode.AUTO
+            label_checks, spacing=2, scroll=ft.ScrollMode.AUTO  # type: ignore[arg-type]
         ) if label_checks else ft.Text(
             "Belum ada label. Buat di halaman Labels.",
             size=12,
@@ -181,6 +200,7 @@ class ApiRefsView(BaseView):
 
     def refresh(self) -> None:
         refs = api_refs_repo.list_api_refs(self.conn)
+        refs = self.sort_items(refs, "service_name")
         self.list_area.controls.clear()
 
         if not refs:
@@ -194,7 +214,6 @@ class ApiRefsView(BaseView):
 
     def _item_card(self, ref: ApiRef) -> ft.Container:
         secret_value = get_secret(ref.keychain_key_name or ref.service_name)
-        copy_target = secret_value or ref.base_url or ref.service_name
 
         labels = labels_repo.get_labels_for_item(self.conn, "api_refs", ref.id)  # type: ignore[arg-type]
         label_chips = ft.Row(
@@ -215,11 +234,11 @@ class ApiRefsView(BaseView):
                             ft.Container(expand=True),
                             _copy_btn(
                                 ft.Icons.CONTENT_COPY,
-                                "Copy",
+                                "Copy URL",
                                 lambda: copy_to_clipboard(
                                     self.page,
-                                    copy_target,
-                                    f'API key "{ref.service_name}" disalin!',
+                                    ref.base_url or ref.service_name,
+                                    f'URL "{ref.service_name}" disalin!',
                                 ),
                             ),
                             _copy_btn(
@@ -227,9 +246,14 @@ class ApiRefsView(BaseView):
                                 "Copy key",
                                 lambda: copy_to_clipboard(
                                     self.page,
-                                    copy_target,
+                                    secret_value or ref.service_name,
                                     f'API key "{ref.service_name}" disalin!',
                                 ),
+                            ),
+                            _action_button(
+                                ft.Icons.COPY_ALL_OUTLINED,
+                                "Duplicate",
+                                lambda e, r=ref: self._duplicate(r),
                             ),
                             _action_button(
                                 ft.Icons.EDIT_OUTLINED,

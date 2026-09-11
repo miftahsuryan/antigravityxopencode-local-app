@@ -30,6 +30,23 @@ class PromptsView(BaseView):
     def _open_edit(self, prompt: Prompt) -> None:
         self._open_dialog(prompt)
 
+    def _duplicate(self, prompt: Prompt) -> None:
+        prompts_repo.create_prompt(
+            self.conn,
+            Prompt(
+                id=None,
+                title=f"{prompt.title} (copy)",
+                content=prompt.content,
+                tool=prompt.tool,
+                label_ids=[
+                    lb.id for lb in labels_repo.get_labels_for_item(
+                        self.conn, "prompts", prompt.id  # type: ignore[arg-type]
+                    ) if lb.id is not None
+                ],
+            ),
+        )
+        self.refresh()
+
     def _open_dialog(self, prompt: Prompt | None) -> None:
         is_edit = prompt is not None
         title_field = ft.TextField(
@@ -48,10 +65,9 @@ class PromptsView(BaseView):
             dense=True,
         )
 
-        # Label multi-select checkboxes
         all_labels = labels_repo.list_labels(self.conn)
         current_label_ids = prompt.label_ids if prompt else []
-        label_checks: list[ft.Control] = []
+        label_checks: list[ft.Checkbox] = []
         for lb in all_labels:
             label_checks.append(
                 ft.Checkbox(
@@ -61,7 +77,7 @@ class PromptsView(BaseView):
                 )
             )
         label_section = ft.Column(
-            controls=label_checks, spacing=2, scroll=ft.ScrollMode.AUTO
+            controls=label_checks, spacing=2, scroll=ft.ScrollMode.AUTO  # type: ignore[arg-type]
         ) if label_checks else ft.Text(
             "Belum ada label. Buat di halaman Labels.",
             size=12,
@@ -136,6 +152,7 @@ class PromptsView(BaseView):
 
     def refresh(self) -> None:
         prompts = prompts_repo.list_prompts(self.conn)
+        prompts = self.sort_items(prompts, "title")
         self.list_area.controls.clear()
 
         if not prompts:
@@ -143,9 +160,7 @@ class PromptsView(BaseView):
                 self.empty_state("Belum ada prompt. Tambahkan yang pertama!")
             )
         else:
-            for p in sorted(
-                prompts, key=lambda x: (not x.is_favorite, x.updated_at or 0)
-            ):
+            for p in prompts:
                 self.list_area.controls.append(self._item_card(p))
         self.page.update()
 
@@ -183,6 +198,11 @@ class PromptsView(BaseView):
                                 icon_color=PALETTE["text.secondary"],
                                 tooltip="Copy",
                                 on_click=lambda e, p=prompt: self._copy(p),
+                            ),
+                            _action_button(
+                                ft.Icons.COPY_ALL_OUTLINED,
+                                "Duplicate",
+                                lambda e, p=prompt: self._duplicate(p),
                             ),
                             _action_button(
                                 ft.Icons.EDIT_OUTLINED,

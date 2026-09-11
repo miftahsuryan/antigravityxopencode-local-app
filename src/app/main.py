@@ -40,6 +40,8 @@ class DevCodexApp:
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.padding = 0
 
+        self.page.on_keyboard_event = self._on_keyboard
+
         self.page.add(
             ft.Row(
                 [
@@ -61,6 +63,15 @@ class DevCodexApp:
         view.refresh()
         self.content_area.content = view.build()
         self.page.update()
+
+    def _on_keyboard(self, e: ft.KeyboardEvent) -> None:
+        if e.key == "N" and e.meta:
+            view = self.views.get(self.current_key)
+            if view:
+                view.on_add()
+                self.page.update()
+        elif e.key == "F" and e.meta:
+            pass  # Cmd+F: search field focus (handled by sidebar click)
 
     def _search(self, query: str) -> None:
         if not query or not query.strip():

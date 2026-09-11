@@ -28,6 +28,23 @@ class CommandsView(BaseView):
     def _open_edit(self, cmd: Command) -> None:
         self._open_dialog(cmd)
 
+    def _duplicate(self, cmd: Command) -> None:
+        commands_repo.create_command(
+            self.conn,
+            Command(
+                id=None,
+                title=f"{cmd.title} (copy)",
+                command_text=cmd.command_text,
+                description=cmd.description,
+                label_ids=[
+                    lb.id for lb in labels_repo.get_labels_for_item(
+                        self.conn, "commands", cmd.id  # type: ignore[arg-type]
+                    ) if lb.id is not None
+                ],
+            ),
+        )
+        self.refresh()
+
     def _open_dialog(self, cmd: Command | None) -> None:
         is_edit = cmd is not None
         title_field = ft.TextField(
@@ -49,7 +66,7 @@ class CommandsView(BaseView):
 
         all_labels = labels_repo.list_labels(self.conn)
         current_label_ids = cmd.label_ids if cmd else []
-        label_checks: list[ft.Control] = []
+        label_checks: list[ft.Checkbox] = []
         for lb in all_labels:
             label_checks.append(
                 ft.Checkbox(
@@ -59,7 +76,7 @@ class CommandsView(BaseView):
                 )
             )
         label_section = ft.Column(
-            label_checks, spacing=2, scroll=ft.ScrollMode.AUTO
+            controls=label_checks, spacing=2, scroll=ft.ScrollMode.AUTO  # type: ignore[arg-type]
         ) if label_checks else ft.Text(
             "Belum ada label. Buat di halaman Labels.",
             size=12,
@@ -129,6 +146,7 @@ class CommandsView(BaseView):
 
     def refresh(self) -> None:
         commands = commands_repo.list_commands(self.conn)
+        commands = self.sort_items(commands, "title")
         self.list_area.controls.clear()
 
         if not commands:
@@ -163,6 +181,11 @@ class CommandsView(BaseView):
                                 icon_color=PALETTE["text.secondary"],
                                 tooltip="Copy",
                                 on_click=lambda e, c=cmd: self._copy(c),
+                            ),
+                            _action_button(
+                                ft.Icons.COPY_ALL_OUTLINED,
+                                "Duplicate",
+                                lambda e, c=cmd: self._duplicate(c),
                             ),
                             _action_button(
                                 ft.Icons.EDIT_OUTLINED,

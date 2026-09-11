@@ -1,8 +1,4 @@
-"""Basis class untuk view modul.
-
-Menyediakan layout header + area list + tombol tambah yang dipakai
-bersama oleh 4 view modul (Notes, Prompts, Commands, API References).
-"""
+"""Basis class untuk view modul."""
 
 from __future__ import annotations
 
@@ -12,6 +8,13 @@ from typing import Any
 import flet as ft
 
 from src.app.theme import PALETTE
+
+SORT_OPTIONS = [
+    ("Terbaru", "newest"),
+    ("Terlama", "oldest"),
+    ("Nama A-Z", "name_asc"),
+    ("Nama Z-A", "name_desc"),
+]
 
 
 class BaseView:
@@ -24,26 +27,21 @@ class BaseView:
         icon: Any,
         on_add: Callable[[], None],
     ) -> None:
-        """Inisialisasi view dasar.
-
-        Args:
-            page: objek Page Flet.
-            title: judul modul.
-            icon: ikon Flet untuk sidebar.
-            on_add: callback saat tombol tambah diklik.
-        """
         self.page = page
         self.title = title
         self.icon = icon
         self.on_add = on_add
+        self._sort_key: str = "newest"
         self.list_area = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def header(self) -> ft.Row:
-        """Buat baris header: judul + tombol tambah.
-
-        Returns:
-            Row berisi judul modul dan tombol \"+ Tambah\".
-        """
+        sort_dropdown = ft.Dropdown(
+            width=140,
+            dense=True,
+            value=self._sort_key,
+            options=[ft.dropdown.Option(val, lbl) for lbl, val in SORT_OPTIONS],
+            on_change=self._on_sort_change,  # type: ignore[call-arg]
+        )
         add_button = ft.IconButton(
             icon=ft.Icons.ADD,
             icon_color=PALETTE["accent.primary"],
@@ -60,21 +58,31 @@ class BaseView:
                     color=PALETTE["text.primary"],
                 ),
                 ft.Container(expand=True),
+                sort_dropdown,
                 add_button,
             ],
             alignment=ft.MainAxisAlignment.START,
             spacing=8,
         )
 
+    def _on_sort_change(self, e: Any) -> None:
+        self._sort_key = e.control.value or "newest"
+        self.refresh()
+
+    def sort_items(self, items: list[Any], key_name: str = "title") -> list[Any]:
+        if self._sort_key == "newest":
+            return sorted(items, key=lambda x: x.updated_at or "", reverse=True)
+        elif self._sort_key == "oldest":
+            return sorted(items, key=lambda x: x.updated_at or "")
+        elif self._sort_key == "name_asc":
+            return sorted(items, key=lambda x: getattr(x, key_name, "").lower())
+        elif self._sort_key == "name_desc":
+            return sorted(
+                items, key=lambda x: getattr(x, key_name, "").lower(), reverse=True
+            )
+        return items
+
     def empty_state(self, message: str) -> ft.Container:
-        """Tampilkan pesan saat daftar kosong.
-
-        Args:
-            message: teks yang ditampilkan.
-
-        Returns:
-            Container dengan konten tengah.
-        """
         return ft.Container(
             content=ft.Column(
                 [
@@ -94,11 +102,6 @@ class BaseView:
         )
 
     def build(self) -> ft.Container:
-        """Kembalikan kontainer utama view.
-
-        Returns:
-            Container berisi header + area list.
-        """
         return ft.Container(
             content=ft.Column(
                 [
@@ -114,5 +117,4 @@ class BaseView:
         )
 
     def refresh(self) -> None:
-        """Perbarui area list (harus dioverride oleh subclass)."""
-        raise NotImplementedError("Subclass harus mengimplementasikan refresh().")
+        raise NotImplementedError

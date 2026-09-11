@@ -1,7 +1,7 @@
 """View modul API References.
 
-List referensi API + form modal tambah/edit + reveal/copy secret dari Keychain.
-Klik tombol salin untuk menyalin API key langsung.
+List referensi API + form modal tambah/edit + copy secret langsung dari Keychain.
+Klik tombol salin (key icon) untuk menyalin API key langsung.
 """
 
 from __future__ import annotations
@@ -32,7 +32,6 @@ class ApiRefsView(BaseView):
         super().__init__(page, "API References", ft.Icons.CODE_OUTLINED, self._open_add)
         self.conn = conn
         self._current_filter_tag: str | None = None
-        self._revealed_keys: set[str] = set()
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -238,22 +237,9 @@ class ApiRefsView(BaseView):
                 self.list_area.controls.append(self._item_card(r))
         self.page.update()
 
-    def _reveal_secret(self, ref: ApiRef) -> str:
-        """Ambil secret dari Keychain, tampilkan atau sembunyikan."""
-        key = ref.keychain_key_name or ref.service_name
-        if key in self._revealed_keys:
-            self._revealed_keys.discard(key)
-            return ""
-        else:
-            self._revealed_keys.add(key)
-            val = get_secret(key)
-            return val or ""
-
     def _item_card(self, ref: ApiRef) -> ft.Container:
         """Render sederhana: service name, base URL, copy key button."""
-        secret_key = ref.keychain_key_name or ref.service_name
-        is_revealed = secret_key in self._revealed_keys
-        secret_value = get_secret(secret_key) if is_revealed else None
+        secret_value = get_secret(ref.keychain_key_name or ref.service_name)
 
         secret_display: ft.Control = ft.Container()
         if secret_value:
@@ -276,6 +262,7 @@ class ApiRefsView(BaseView):
                 spacing=4,
             )
 
+        copy_target = secret_value or ref.base_url or ref.service_name
         return ft.Container(
             content=ft.Column(
                 [
@@ -290,17 +277,21 @@ class ApiRefsView(BaseView):
                             ft.Container(expand=True),
                             _copy_btn(
                                 ft.Icons.CONTENT_COPY,
-                                f'API key "{ref.service_name}" disalin!',
+                                "Copy",
                                 lambda: copy_to_clipboard(
                                     self.page,
-                                    secret_value or ref.base_url or ref.service_name,
+                                    copy_target,
                                     f'API key "{ref.service_name}" disalin!',
                                 ),
                             ),
                             _copy_btn(
                                 ft.Icons.KEY_OUTLINED,
-                                "Reveal key",
-                                lambda: self._toggle_reveal(ref),
+                                "Copy key",
+                                lambda: copy_to_clipboard(
+                                    self.page,
+                                    copy_target,
+                                    f'API key "{ref.service_name}" disalin!',
+                                ),
                             ),
                             _action_button(
                                 ft.Icons.EDIT_OUTLINED,
@@ -351,15 +342,6 @@ class ApiRefsView(BaseView):
             padding=12,
         )
 
-    def _toggle_reveal(self, ref: ApiRef) -> None:
-        """Toggle reveal state dan refresh."""
-        secret_key = ref.keychain_key_name or ref.service_name
-        if secret_key in self._revealed_keys:
-            self._revealed_keys.discard(secret_key)
-        else:
-            self._revealed_keys.add(secret_key)
-        self.page.update()
-
     def _tag_chip(self, tag: str) -> ft.Container:
         """Buat tag chip yang bisa diklik untuk filter."""
         is_active = self._current_filter_tag == tag
@@ -380,7 +362,7 @@ class ApiRefsView(BaseView):
 
 
 def _copy_btn(icon: Any, tooltip: str, on_click: Any) -> ft.IconButton:
-    """Tombol salin/reveal kecil dengan warna hijau."""
+    """Tombol salin kecil dengan warna hijau."""
     return ft.IconButton(
         icon=icon,
         icon_color=PALETTE["state.success"],

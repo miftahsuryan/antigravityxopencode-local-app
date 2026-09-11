@@ -40,7 +40,7 @@ class BaseView:
             dense=True,
             value=self._sort_key,
             options=[ft.dropdown.Option(val, lbl) for lbl, val in SORT_OPTIONS],
-            on_change=self._on_sort_change,  # type: ignore[call-arg]
+            on_select=self._on_sort_select,
         )
         add_button = ft.IconButton(
             icon=ft.Icons.ADD,
@@ -65,7 +65,7 @@ class BaseView:
             spacing=8,
         )
 
-    def _on_sort_change(self, e: Any) -> None:
+    def _on_sort_select(self, e: Any) -> None:
         self._sort_key = e.control.value or "newest"
         self.refresh()
 

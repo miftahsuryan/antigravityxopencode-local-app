@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from datetime import datetime
 
 from src.core.models import Command
+from src.core.storage.labels_repo import set_item_labels
 
 
 def _row_to_command(row: sqlite3.Row) -> Command:
@@ -15,8 +15,6 @@ def _row_to_command(row: sqlite3.Row) -> Command:
         title=row["title"],
         command_text=row["command_text"],
         description=row["description"],
-        tags=json.loads(row["tags"]),
-        project_id=row["project_id"],
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
     )
@@ -24,31 +22,22 @@ def _row_to_command(row: sqlite3.Row) -> Command:
 
 def create_command(conn: sqlite3.Connection, cmd: Command) -> Command:
     cur = conn.execute(
-        "INSERT INTO commands (title, command_text, description, tags, project_id) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (
-            cmd.title, cmd.command_text, cmd.description,
-            json.dumps(cmd.tags), cmd.project_id,
-        ),
+        "INSERT INTO commands (title, command_text, description) "
+        "VALUES (?, ?, ?)",
+        (cmd.title, cmd.command_text, cmd.description),
     )
     conn.commit()
+    item_id = cur.lastrowid
+    assert item_id is not None
+    if cmd.label_ids:
+        set_item_labels(conn, "commands", item_id, cmd.label_ids)
     return _row_to_command(
-        conn.execute("SELECT * FROM commands WHERE id = ?", (cur.lastrowid,)).fetchone()
+        conn.execute("SELECT * FROM commands WHERE id = ?", (item_id,)).fetchone()
     )
 
 
 def list_commands(conn: sqlite3.Connection) -> list[Command]:
     rows = conn.execute("SELECT * FROM commands ORDER BY updated_at DESC").fetchall()
-    return [_row_to_command(r) for r in rows]
-
-
-def list_commands_by_project(
-    conn: sqlite3.Connection, project_id: int
-) -> list[Command]:
-    rows = conn.execute(
-        "SELECT * FROM commands WHERE project_id = ? ORDER BY updated_at DESC",
-        (project_id,),
-    ).fetchall()
     return [_row_to_command(r) for r in rows]
 
 
@@ -60,23 +49,22 @@ def get_command(conn: sqlite3.Connection, cmd_id: int) -> Command | None:
 def update_command(conn: sqlite3.Connection, cmd: Command) -> Command | None:
     conn.execute(
         """UPDATE commands
-           SET title = ?, command_text = ?, description = ?, tags = ?,
-               project_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%S','now')
+           SET title = ?, command_text = ?, description = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%S','now')
            WHERE id = ?""",
-        (
-            cmd.title,
-            cmd.command_text,
-            cmd.description,
-            json.dumps(cmd.tags),
-            cmd.project_id,
-            cmd.id,
-        ),
+        (cmd.title, cmd.command_text, cmd.description, cmd.id),
     )
     conn.commit()
+    if cmd.id is not None:
+        set_item_labels(conn, "commands", cmd.id, cmd.label_ids)
     return get_command(conn, cmd.id)  # type: ignore[arg-type]
 
 
 def delete_command(conn: sqlite3.Connection, cmd_id: int) -> bool:
+    conn.execute(
+        "DELETE FROM label_items WHERE item_type = 'commands' AND item_id = ?",
+        (cmd_id,),
+    )
     cur = conn.execute("DELETE FROM commands WHERE id = ?", (cmd_id,))
     conn.commit()
     return cur.rowcount > 0

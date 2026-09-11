@@ -29,7 +29,6 @@ def test_create_and_get(conn: sqlite3.Connection) -> None:
         title="Docker PS",
         command_text="docker ps -a",
         description="List all containers",
-        tags=["docker"],
     )
     saved = create_command(conn, cmd)
     assert saved.id is not None
@@ -37,7 +36,7 @@ def test_create_and_get(conn: sqlite3.Connection) -> None:
 
     fetched = get_command(conn, saved.id)
     assert fetched is not None
-    assert fetched.tags == ["docker"]
+    assert fetched.command_text == "docker ps -a"
 
 
 def test_list_commands(conn: sqlite3.Connection) -> None:

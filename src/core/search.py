@@ -23,9 +23,9 @@ def search_all(
     pattern = f"%{query.strip()}%"
     results: list[SearchResult] = []
 
-    # Projects
+    # Labels
     rows = conn.execute(
-        """SELECT id, name, description FROM projects
+        """SELECT id, name, description FROM labels
            WHERE name LIKE ? OR description LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
         (pattern, pattern, limit),
@@ -33,7 +33,7 @@ def search_all(
     for r in rows:
         results.append(
             SearchResult(
-                module="projects",
+                module="labels",
                 item_id=r["id"],
                 title=r["name"],
                 snippet=r["description"][:80] if r["description"] else "",
@@ -42,20 +42,19 @@ def search_all(
 
     # Prompts
     rows = conn.execute(
-        """SELECT p.id, p.title, p.content
-           FROM prompts p
-           WHERE p.title LIKE ? OR p.content LIKE ? OR p.tool LIKE ? OR p.tags LIKE ?
+        """SELECT p.id, p.title, p.content FROM prompts p
+           WHERE p.title LIKE ? OR p.content LIKE ?
+           OR p.tool LIKE ?
            ORDER BY p.updated_at DESC LIMIT ?""",
-        (pattern, pattern, pattern, pattern, limit),
+        (pattern, pattern, pattern, limit),
     ).fetchall()
     for r in rows:
-        content_preview = (r["content"] or "")[:80]
         results.append(
             SearchResult(
                 module="prompts",
                 item_id=r["id"],
                 title=r["title"],
-                snippet=content_preview,
+                snippet=(r["content"] or "")[:80],
             )
         )
 
@@ -63,9 +62,9 @@ def search_all(
     rows = conn.execute(
         """SELECT id, title, command_text FROM commands
            WHERE title LIKE ? OR command_text LIKE ?
-           OR description LIKE ? OR tags LIKE ?
+           OR description LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
-        (pattern, pattern, pattern, pattern, limit),
+        (pattern, pattern, pattern, limit),
     ).fetchall()
     for r in rows:
         results.append(
@@ -81,9 +80,9 @@ def search_all(
     rows = conn.execute(
         """SELECT id, service_name, base_url FROM api_refs
            WHERE service_name LIKE ? OR base_url LIKE ?
-           OR description LIKE ? OR tags LIKE ?
+           OR description LIKE ?
            ORDER BY updated_at DESC LIMIT ?""",
-        (pattern, pattern, pattern, pattern, limit),
+        (pattern, pattern, pattern, limit),
     ).fetchall()
     for r in rows:
         results.append(

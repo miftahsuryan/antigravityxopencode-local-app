@@ -31,7 +31,6 @@ def test_create_and_get(conn: sqlite3.Connection) -> None:
         description="GitHub REST API",
         auth_type="Bearer",
         keychain_key_name="github-token",
-        tags=["github"],
     )
     saved = create_api_ref(conn, ref)
     assert saved.id is not None

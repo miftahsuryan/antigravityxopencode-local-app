@@ -1,8 +1,4 @@
-"""Entry point aplikasi DevCodex.
-
-Merakit layout utama: sidebar (navigasi + search) di kiri dan area konten
-di kanan.  Menangani routing antar modul dan tampilan hasil search global.
-"""
+"""Entry point aplikasi DevCodex."""
 
 from __future__ import annotations
 
@@ -15,7 +11,7 @@ from src.app.theme import PALETTE
 from src.app.views.api_refs_view import ApiRefsView
 from src.app.views.base import BaseView
 from src.app.views.commands_view import CommandsView
-from src.app.views.projects_view import ProjectsView
+from src.app.views.labels_view import LabelsView
 from src.app.views.prompts_view import PromptsView
 from src.core.search import SearchResult, search_all
 from src.core.storage.db import init_db
@@ -29,7 +25,7 @@ class DevCodexApp:
         self.conn: sqlite3.Connection = init_db()
 
         self.views: dict[str, BaseView] = {
-            "projects": ProjectsView(page, self.conn),
+            "labels": LabelsView(page, self.conn),
             "prompts": PromptsView(page, self.conn),
             "commands": CommandsView(page, self.conn),
             "api_refs": ApiRefsView(page, self.conn),
@@ -37,7 +33,7 @@ class DevCodexApp:
         self.content_area = ft.Container(expand=True)
 
         self.sidebar = Sidebar(page, self._navigate, self._search)
-        self.current_key: str = "projects"
+        self.current_key: str = "labels"
 
         self.page.title = "DevCodex"
         self.page.bgcolor = PALETTE["bg.base"]
@@ -56,7 +52,7 @@ class DevCodexApp:
             )
         )
 
-        self._navigate("projects")
+        self._navigate("labels")
 
     def _navigate(self, key: str) -> None:
         self.current_key = key
@@ -76,7 +72,9 @@ class DevCodexApp:
         self.content_area.content = self._render_results(query, results)
         self.page.update()
 
-    def _render_results(self, query: str, results: list[SearchResult]) -> ft.Container:
+    def _render_results(
+        self, query: str, results: list[SearchResult]
+    ) -> ft.Container:
         rows: list[ft.Control] = [
             ft.Text(
                 f'Hasil untuk "{query}"',
@@ -110,7 +108,7 @@ class DevCodexApp:
 
     def _result_item(self, r: SearchResult, query: str) -> ft.Container:
         module_label = {
-            "projects": "Projects",
+            "labels": "Labels",
             "prompts": "Prompts",
             "commands": "Commands",
             "api_refs": "API",
@@ -120,7 +118,9 @@ class DevCodexApp:
                 [
                     ft.Container(
                         content=ft.Text(
-                            module_label, size=11, color=PALETTE["text.secondary"]
+                            module_label,
+                            size=11,
+                            color=PALETTE["text.secondary"],
                         ),
                         bgcolor=PALETTE["bg.surface-hover"],
                         padding=ft.Padding.symmetric(horizontal=6, vertical=2),
@@ -151,12 +151,9 @@ class DevCodexApp:
             border=ft.Border.all(1, PALETTE["border.subtle"]),
             border_radius=8,
             padding=12,
-            on_click=lambda e, k=r.module, i=r.item_id: self._open_result(k, i),
+            on_click=lambda e, k=r.module: self._navigate(k),
             ink=True,
         )
-
-    def _open_result(self, module: str, item_id: int) -> None:
-        self._navigate(module)
 
 
 def main(page: ft.Page) -> None:

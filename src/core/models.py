@@ -7,9 +7,10 @@ from datetime import datetime
 
 
 @dataclass
-class Project:
+class Label:
     id: int | None
     name: str
+    color: str = "#6C8CFF"
     description: str = ""
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -21,9 +22,8 @@ class Prompt:
     title: str
     content: str
     tool: str = ""
-    tags: list[str] = field(default_factory=list)
     is_favorite: bool = False
-    project_id: int | None = None
+    label_ids: list[int] = field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -34,8 +34,7 @@ class Command:
     title: str
     command_text: str
     description: str = ""
-    tags: list[str] = field(default_factory=list)
-    project_id: int | None = None
+    label_ids: list[int] = field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -48,7 +47,6 @@ class ApiRef:
     description: str = ""
     auth_type: str = ""
     keychain_key_name: str = ""
-    tags: list[str] = field(default_factory=list)
-    project_id: int | None = None
+    label_ids: list[int] = field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None

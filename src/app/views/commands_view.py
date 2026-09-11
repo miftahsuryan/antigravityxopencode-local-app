@@ -1,8 +1,4 @@
-"""View modul Commands.
-
-List command terminal + form modal tambah/edit + quick-copy.
-Hanya menyimpan teks — tidak mengeksekusi apa pun (lihat aturan keamanan).
-"""
+"""View modul Commands."""
 
 from __future__ import annotations
 
@@ -15,46 +11,24 @@ from src.app.theme import PALETTE
 from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import Command
-from src.core.storage import commands_repo, projects_repo
+from src.core.storage import commands_repo, labels_repo
 
 
 class CommandsView(BaseView):
     """View untuk CRUD command snippets."""
 
     def __init__(self, page: ft.Page, conn: sqlite3.Connection) -> None:
-        """Inisialisasi view Commands.
-
-        Args:
-            page: objek Page Flet.
-            conn: koneksi SQLite yang sudah siap.
-        """
         super().__init__(page, "Commands", ft.Icons.TERMINAL_OUTLINED, self._open_add)
         self.conn = conn
-        self._current_filter_tag: str | None = None
         self.refresh()
 
-    # ------------------------------------------------------------------
-    # Form & dialog
-    # ------------------------------------------------------------------
-
     def _open_add(self) -> None:
-        """Buka dialog form tambah command baru."""
         self._open_dialog(None)
 
     def _open_edit(self, cmd: Command) -> None:
-        """Buka dialog form edit command.
-
-        Args:
-            cmd: Command yang akan diedit.
-        """
         self._open_dialog(cmd)
 
     def _open_dialog(self, cmd: Command | None) -> None:
-        """Tampilkan modal form tambah/edit.
-
-        Args:
-            cmd: Command untuk mode edit, atau None untuk mode tambah.
-        """
         is_edit = cmd is not None
         title_field = ft.TextField(
             label="Judul", value=cmd.title if cmd else "", dense=True
@@ -72,27 +46,35 @@ class CommandsView(BaseView):
             min_lines=2,
             max_lines=4,
         )
-        tags_field = ft.TextField(
-            label="Tags (pisahkan dengan koma)",
-            value=", ".join(cmd.tags) if cmd else "",
-            dense=True,
+
+        all_labels = labels_repo.list_labels(self.conn)
+        current_label_ids = cmd.label_ids if cmd else []
+        label_checks: list[ft.Control] = []
+        for lb in all_labels:
+            label_checks.append(
+                ft.Checkbox(
+                    label=lb.name,
+                    value=lb.id in current_label_ids,
+                    data=lb.id,
+                )
+            )
+        label_section = ft.Column(
+            label_checks, spacing=2, scroll=ft.ScrollMode.AUTO
+        ) if label_checks else ft.Text(
+            "Belum ada label. Buat di halaman Labels.",
+            size=12,
+            color=PALETTE["text.secondary"],
         )
 
         def _save(e: Any) -> None:
-            tags = [t.strip() for t in (tags_field.value or "").split(",") if t.strip()]
-            pid: int | None = None
-            raw_pid = project_field.value if project_field else None
-            if raw_pid and raw_pid != "":
-                try:
-                    pid = int(raw_pid)
-                except ValueError:
-                    pid = None
+            selected_ids = [
+                cb.data for cb in label_checks if cb.value  # type: ignore[attr-defined]
+            ]
             if is_edit and cmd:
                 cmd.title = (title_field.value or "").strip()
                 cmd.command_text = (command_field.value or "").strip()
                 cmd.description = desc_field.value or ""
-                cmd.tags = tags
-                cmd.project_id = pid
+                cmd.label_ids = selected_ids
                 commands_repo.update_command(self.conn, cmd)
             else:
                 commands_repo.create_command(
@@ -102,31 +84,17 @@ class CommandsView(BaseView):
                         title=(title_field.value or "").strip(),
                         command_text=(command_field.value or "").strip(),
                         description=desc_field.value or "",
-                        tags=tags,
-                        project_id=pid,
+                        label_ids=selected_ids,
                     ),
                 )
             self.page.pop_dialog()
             self.refresh()
 
-        project_options = [ft.dropdown.Option("")]
-        projects = projects_repo.list_projects(self.conn)
-        for p in projects:
-            project_options.append(ft.dropdown.Option(str(p.id), p.name))
-
-        project_field = ft.Dropdown(
-            label="Project",
-            options=project_options,
-            dense=True,
-        )
-        if is_edit and cmd and cmd.project_id:
-            project_field.value = str(cmd.project_id)
-
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Edit Command" if is_edit else "Tambah Command"),
             content=ft.Column(
-                [title_field, project_field, command_field, desc_field, tags_field],
+                [title_field, command_field, desc_field, label_section],
                 spacing=8,
                 tight=True,
                 scroll=ft.ScrollMode.AUTO,
@@ -139,12 +107,6 @@ class CommandsView(BaseView):
         self.page.show_dialog(dialog)
 
     def _delete(self, cmd: Command) -> None:
-        """Hapus command (dengan konfirmasi).
-
-        Args:
-            cmd: Command yang akan dihapus.
-        """
-
         def _confirm(e: Any) -> None:
             commands_repo.delete_command(self.conn, cmd.id)  # type: ignore[arg-type]
             self.page.pop_dialog()
@@ -165,57 +127,7 @@ class CommandsView(BaseView):
         )
         self.page.show_dialog(dialog)
 
-    # ------------------------------------------------------------------
-    # Filter & tag
-    # ------------------------------------------------------------------
-
-    def _chip_click(self, tag: str) -> None:
-        """Toggle filter by tag saat tag chip diklik.
-
-        Args:
-            tag: Tag yang diklik.
-        """
-        if self._current_filter_tag == tag:
-            self._current_filter_tag = None
-        else:
-            self._current_filter_tag = tag
-        self._apply_filter()
-
-    def _clear_filter(self) -> None:
-        """Hapus filter tag dan tampilkan semua command."""
-        self._current_filter_tag = None
-        self.refresh()
-
-    def _apply_filter(self) -> None:
-        """Terapkan filter berdasarkan tag yang sedang aktif."""
-        commands = commands_repo.list_commands(self.conn)
-        self.list_area.controls.clear()
-
-        if self._current_filter_tag:
-            filtered = [c for c in commands if self._current_filter_tag in c.tags]
-            if not filtered:
-                tag = self._current_filter_tag
-                msg = f"Tidak ada command dengan tag '{tag}'"
-                self.list_area.controls.append(self.empty_state(msg))
-            else:
-                for c in filtered:
-                    self.list_area.controls.append(self._item_card(c))
-        else:
-            if not commands:
-                self.list_area.controls.append(
-                    self.empty_state("Belum ada command. Tambahkan yang pertama!")
-                )
-            else:
-                for c in commands:
-                    self.list_area.controls.append(self._item_card(c))
-        self.page.update()
-
-    # ------------------------------------------------------------------
-    # Render
-    # ------------------------------------------------------------------
-
     def refresh(self) -> None:
-        """Perbarui daftar command di area list."""
         commands = commands_repo.list_commands(self.conn)
         self.list_area.controls.clear()
 
@@ -229,17 +141,11 @@ class CommandsView(BaseView):
         self.page.update()
 
     def _item_card(self, cmd: Command) -> ft.Container:
-        """Render satu kartu command.
+        labels = labels_repo.get_labels_for_item(self.conn, "commands", cmd.id)  # type: ignore[arg-type]
+        label_chips = ft.Row(
+            [_label_chip(lb) for lb in labels], spacing=4
+        ) if labels else ft.Container()
 
-        Args:
-            cmd: Command yang dirender.
-
-        Returns:
-            Container kartu command.
-        """
-        tag_chips: list[ft.Control] = [
-            self._tag_chip(t) for t in cmd.tags
-        ]
         return ft.Container(
             content=ft.Column(
                 [
@@ -272,7 +178,7 @@ class CommandsView(BaseView):
                         ],
                         spacing=4,
                     ),
-                    ft.Row(tag_chips, spacing=4) if tag_chips else ft.Container(),
+                    label_chips,
                     ft.Container(
                         content=ft.Text(
                             cmd.command_text,
@@ -299,56 +205,24 @@ class CommandsView(BaseView):
             padding=12,
         )
 
-    def _tag_chip(self, tag: str) -> ft.Container:
-        """Buat tag chip yang bisa diklik untuk filter.
-
-        Args:
-            tag: Teks tag.
-
-        Returns:
-            Container yang bisa diklik.
-        """
-        is_active = self._current_filter_tag == tag
-        accent = PALETTE["accent.primary"]
-        surface = PALETTE["bg.surface-hover"]
-        base = PALETTE["bg.base"]
-        secondary = PALETTE["text.secondary"]
-        chip_bg = accent if is_active else surface
-        chip_fg = base if is_active else secondary
-        return ft.Container(
-            content=ft.Text(tag, size=11, color=chip_fg),
-            bgcolor=chip_bg,
-            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
-            border_radius=8,
-            on_click=lambda e, t=tag: self._chip_click(t),
-            ink=True,
-        )
-
     def _copy(self, cmd: Command) -> None:
-        """Salin command ke clipboard & tampilkan snackbar.
-
-        Args:
-            cmd: Command yang disalin.
-        """
         copy_to_clipboard(
             self.page, cmd.command_text, f'Command "{cmd.title}" disalin.'
         )
 
 
+def _label_chip(label: Any) -> ft.Container:
+    return ft.Container(
+        content=ft.Text(label.name, size=10, color=PALETTE["bg.base"]),
+        bgcolor=label.color,
+        padding=ft.Padding.symmetric(horizontal=6, vertical=1),
+        border_radius=4,
+    )
+
+
 def _action_button(
     icon: Any, tooltip: str, on_click: Any, danger: bool = False
 ) -> ft.IconButton:
-    """Buat tombol aksi ikon kecil.
-
-    Args:
-        icon: ikon Flet.
-        tooltip: tooltip tombol.
-        on_click: callback saat diklik.
-        danger: True untuk style merah.
-
-    Returns:
-        IconButton.
-    """
     return ft.IconButton(
         icon=icon,
         icon_color=PALETTE["state.danger"] if danger else PALETTE["text.secondary"],

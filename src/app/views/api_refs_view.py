@@ -1,8 +1,4 @@
-"""View modul API References.
-
-List referensi API + form modal tambah/edit + copy secret langsung dari Keychain.
-Klik tombol salin (key icon) untuk menyalin API key langsung.
-"""
+"""View modul API References."""
 
 from __future__ import annotations
 
@@ -16,38 +12,24 @@ from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
 from src.core.models import ApiRef
 from src.core.secrets import get_secret, store_secret
-from src.core.storage import api_refs_repo, projects_repo
+from src.core.storage import api_refs_repo, labels_repo
 
 
 class ApiRefsView(BaseView):
     """View untuk CRUD API reference."""
 
     def __init__(self, page: ft.Page, conn: sqlite3.Connection) -> None:
-        """Inisialisasi view API References.
-
-        Args:
-            page: objek Page Flet.
-            conn: koneksi SQLite yang sudah siap.
-        """
         super().__init__(page, "API References", ft.Icons.CODE_OUTLINED, self._open_add)
         self.conn = conn
-        self._current_filter_tag: str | None = None
         self.refresh()
 
-    # ------------------------------------------------------------------
-    # Form & dialog
-    # ------------------------------------------------------------------
-
     def _open_add(self) -> None:
-        """Buka dialog form tambah api ref baru."""
         self._open_dialog(None)
 
     def _open_edit(self, ref: ApiRef) -> None:
-        """Buka dialog form edit api ref."""
         self._open_dialog(ref)
 
     def _open_dialog(self, ref: ApiRef | None) -> None:
-        """Tampilkan modal form tambah/edit."""
         is_edit = ref is not None
         name_field = ft.TextField(
             label="Nama service",
@@ -94,30 +76,38 @@ class ApiRefsView(BaseView):
             existing_secret = get_secret(ref.keychain_key_name)
             if existing_secret:
                 secret_field.value = existing_secret
-        tags_field = ft.TextField(
-            label="Tags (pisahkan dengan koma)",
-            value=", ".join(ref.tags) if ref else "",
-            dense=True,
+
+        all_labels = labels_repo.list_labels(self.conn)
+        current_label_ids = ref.label_ids if ref else []
+        label_checks: list[ft.Control] = []
+        for lb in all_labels:
+            label_checks.append(
+                ft.Checkbox(
+                    label=lb.name,
+                    value=lb.id in current_label_ids,
+                    data=lb.id,
+                )
+            )
+        label_section = ft.Column(
+            label_checks, spacing=2, scroll=ft.ScrollMode.AUTO
+        ) if label_checks else ft.Text(
+            "Belum ada label. Buat di halaman Labels.",
+            size=12,
+            color=PALETTE["text.secondary"],
         )
 
         def _save(e: Any) -> None:
-            tags = [t.strip() for t in (tags_field.value or "").split(",") if t.strip()]
+            selected_ids = [
+                cb.data for cb in label_checks if cb.value  # type: ignore[attr-defined]
+            ]
             keychain_name = (keychain_field.value or "").strip()
-            pid: int | None = None
-            raw_pid = project_field.value if project_field else None
-            if raw_pid and raw_pid != "":
-                try:
-                    pid = int(raw_pid)
-                except ValueError:
-                    pid = None
             if is_edit and ref:
                 ref.service_name = (name_field.value or "").strip()
                 ref.base_url = (url_field.value or "").strip()
                 ref.description = desc_field.value or ""
                 ref.auth_type = auth_field.value or ""
                 ref.keychain_key_name = keychain_name
-                ref.tags = tags
-                ref.project_id = pid
+                ref.label_ids = selected_ids
                 api_refs_repo.update_api_ref(self.conn, ref)
             else:
                 api_refs_repo.create_api_ref(
@@ -129,8 +119,7 @@ class ApiRefsView(BaseView):
                         description=desc_field.value or "",
                         auth_type=auth_field.value or "",
                         keychain_key_name=keychain_name,
-                        tags=tags,
-                        project_id=pid,
+                        label_ids=selected_ids,
                     ),
                 )
             if keychain_name:
@@ -145,19 +134,6 @@ class ApiRefsView(BaseView):
             self.page.pop_dialog()
             self.refresh()
 
-        project_options = [ft.dropdown.Option("")]
-        projects = projects_repo.list_projects(self.conn)
-        for p in projects:
-            project_options.append(ft.dropdown.Option(str(p.id), p.name))
-
-        project_field = ft.Dropdown(
-            label="Project",
-            options=project_options,
-            dense=True,
-        )
-        if is_edit and ref and ref.project_id:
-            project_field.value = str(ref.project_id)
-
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Edit API Reference" if is_edit else "Tambah API Reference"),
@@ -169,8 +145,7 @@ class ApiRefsView(BaseView):
                     auth_field,
                     keychain_field,
                     secret_field,
-                    tags_field,
-                    project_field,
+                    label_section,
                 ],
                 spacing=8,
                 tight=True,
@@ -184,8 +159,6 @@ class ApiRefsView(BaseView):
         self.page.show_dialog(dialog)
 
     def _delete(self, ref: ApiRef) -> None:
-        """Hapus api ref (dengan konfirmasi)."""
-
         def _confirm(e: Any) -> None:
             api_refs_repo.delete_api_ref(self.conn, ref.id)  # type: ignore[arg-type]
             self.page.pop_dialog()
@@ -206,48 +179,7 @@ class ApiRefsView(BaseView):
         )
         self.page.show_dialog(dialog)
 
-    # ------------------------------------------------------------------
-    # Filter & tag
-    # ------------------------------------------------------------------
-
-    def _chip_click(self, tag: str) -> None:
-        """Toggle filter by tag saat tag chip diklik."""
-        if self._current_filter_tag == tag:
-            self._current_filter_tag = None
-        else:
-            self._current_filter_tag = tag
-        self._apply_filter()
-
-    def _apply_filter(self) -> None:
-        """Terapkan filter berdasarkan tag yang sedang aktif."""
-        refs = api_refs_repo.list_api_refs(self.conn)
-        self.list_area.controls.clear()
-
-        if self._current_filter_tag:
-            filtered = [r for r in refs if self._current_filter_tag in r.tags]
-            if not filtered:
-                tag = self._current_filter_tag
-                msg = f"Tidak ada API dengan tag '{tag}'"
-                self.list_area.controls.append(self.empty_state(msg))
-            else:
-                for r in filtered:
-                    self.list_area.controls.append(self._item_card(r))
-        else:
-            if not refs:
-                self.list_area.controls.append(
-                    self.empty_state("Belum ada API reference. Tambahkan yang pertama!")
-                )
-            else:
-                for r in refs:
-                    self.list_area.controls.append(self._item_card(r))
-        self.page.update()
-
-    # ------------------------------------------------------------------
-    # Render
-    # ------------------------------------------------------------------
-
     def refresh(self) -> None:
-        """Perbarui daftar api ref di area list."""
         refs = api_refs_repo.list_api_refs(self.conn)
         self.list_area.controls.clear()
 
@@ -261,31 +193,14 @@ class ApiRefsView(BaseView):
         self.page.update()
 
     def _item_card(self, ref: ApiRef) -> ft.Container:
-        """Render sederhana: service name, base URL, copy key button."""
         secret_value = get_secret(ref.keychain_key_name or ref.service_name)
-
-        secret_display: ft.Control = ft.Container()
-        if secret_value:
-            secret_display = ft.Row(
-                [
-                    ft.Text(
-                        "API Key:",
-                        size=11,
-                        color=PALETTE["text.secondary"],
-                    ),
-                    ft.Text(
-                        secret_value,
-                        size=12,
-                        color=PALETTE["accent.mint"],
-                        style=ft.TextStyle(font_family="monospace"),
-                        max_lines=1,
-                        overflow=ft.TextOverflow.ELLIPSIS,
-                    ),
-                ],
-                spacing=4,
-            )
-
         copy_target = secret_value or ref.base_url or ref.service_name
+
+        labels = labels_repo.get_labels_for_item(self.conn, "api_refs", ref.id)  # type: ignore[arg-type]
+        label_chips = ft.Row(
+            [_label_chip(lb) for lb in labels], spacing=4
+        ) if labels else ft.Container()
+
         return ft.Container(
             content=ft.Column(
                 [
@@ -330,13 +245,13 @@ class ApiRefsView(BaseView):
                         ],
                         spacing=4,
                     ),
+                    label_chips,
                     ft.Text(
                         ref.base_url,
                         size=12,
                         color=PALETTE["accent.mint"],
                         style=ft.TextStyle(font_family="monospace"),
                     ),
-                    secret_display,
                     ft.Row(
                         [
                             ft.Container(
@@ -351,7 +266,6 @@ class ApiRefsView(BaseView):
                                 ),
                                 border_radius=6,
                             ),
-                            *[self._tag_chip(t) for t in ref.tags],
                         ],
                         spacing=4,
                         alignment=ft.MainAxisAlignment.START,
@@ -365,27 +279,17 @@ class ApiRefsView(BaseView):
             padding=12,
         )
 
-    def _tag_chip(self, tag: str) -> ft.Container:
-        """Buat tag chip yang bisa diklik untuk filter."""
-        is_active = self._current_filter_tag == tag
-        accent = PALETTE["accent.primary"]
-        surface = PALETTE["bg.surface-hover"]
-        base = PALETTE["bg.base"]
-        secondary = PALETTE["text.secondary"]
-        chip_bg = accent if is_active else surface
-        chip_fg = base if is_active else secondary
-        return ft.Container(
-            content=ft.Text(tag, size=11, color=chip_fg),
-            bgcolor=chip_bg,
-            padding=ft.Padding.symmetric(horizontal=8, vertical=2),
-            border_radius=8,
-            on_click=lambda e, t=tag: self._chip_click(t),
-            ink=True,
-        )
+
+def _label_chip(label: Any) -> ft.Container:
+    return ft.Container(
+        content=ft.Text(label.name, size=10, color=PALETTE["bg.base"]),
+        bgcolor=label.color,
+        padding=ft.Padding.symmetric(horizontal=6, vertical=1),
+        border_radius=4,
+    )
 
 
 def _copy_btn(icon: Any, tooltip: str, on_click: Any) -> ft.IconButton:
-    """Tombol salin kecil dengan warna hijau."""
     return ft.IconButton(
         icon=icon,
         icon_color=PALETTE["state.success"],
@@ -397,7 +301,6 @@ def _copy_btn(icon: Any, tooltip: str, on_click: Any) -> ft.IconButton:
 def _action_button(
     icon: Any, tooltip: str, on_click: Any, danger: bool = False
 ) -> ft.IconButton:
-    """Buat tombol aksi ikon kecil."""
     return ft.IconButton(
         icon=icon,
         icon_color=PALETTE["state.danger"] if danger else PALETTE["text.secondary"],

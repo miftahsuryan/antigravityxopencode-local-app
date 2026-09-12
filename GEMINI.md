@@ -51,15 +51,15 @@ devcodex/
 └── data/                  # sample/vault lokal utk dev — DB asli di App Support (di-gitignore)
 ```
 
-## 4. Fitur Inti (v1 — MVP Selesai)
+## 4. Fitur Inti (v1.5 — Label System Selesai)
 
-1. **Notes** — CRUD catatan Markdown, folder + tag, full-text search, **copy ke clipboard**, **filter by tag**, tampilan konten penuh.
-2. **Prompt Library** — simpan prompt AI, kategori per tool/model, tag, favorit/pin, **quick-copy**, **filter by tag**.
-3. **Command Snippets** — simpan command terminal + deskripsi + tag, **quick-copy**, **filter by tag**.
-4. **API References** — simpan nama service, base URL, deskripsi, tipe auth, tag. Secret disimpan di **macOS Keychain**, dapat di-reveal dan disalin langsung dari kartu.
-5. **Cross-cutting:** global search (lintas 4 modul sekaligus), sidebar navigasi 4 section + search bar di atas, dark mode sebagai default, **filter tag pada setiap modul**, **copy to clipboard**.
+1. **Labels** — CRUD label dengan warna, filtered view per label, item counts.
+2. **Prompt Library** — simpan prompt AI, kategori per tool/model, label, favorit/pin, quick-copy, duplicate.
+3. **Command Snippets** — simpan command terminal + deskripsi + label, quick-copy, duplicate.
+4. **API References** — simpan nama service, base URL, deskripsi, tipe auth, label. Secret disimpan di **macOS Keychain**, dapat di-reveal dan disalin langsung dari kartu. Dual copy: URL + key.
+5. **Cross-cutting:** global search (lintas 4 modul sekaligus), sidebar navigasi 4 section + search bar di atas, dark mode sebagai default, sorting (newest/oldest/name), keyboard shortcuts (Cmd+N, Cmd+F), hover effects pada kartu.
 
-Fitur yang **sengaja ditunda** ke v2+ (jangan dikerjakan tanpa diminta eksplisit): sync cloud, run-command langsung dari app, multi-user/sharing, plugin pihak ketiga.
+Fitur yang **sengaja ditunda** ke v2+: import/export JSON, markdown preview, template variables, bulk actions, API playground, command runner, sync cloud, multi-user.
 
 ## 5. Aturan Wajib (Rules)
 

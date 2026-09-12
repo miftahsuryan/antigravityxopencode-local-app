@@ -1,14 +1,14 @@
 # DevCodex
 
-Vault personal untuk merekap catatan Markdown, prompt AI, command terminal, dan referensi API dalam satu aplikasi desktop lokal (macOS, Apple Silicon).
+Vault personal untuk menyimpan dan mengelola prompt AI, command terminal, dan referensi API dalam satu aplikasi desktop lokal (macOS).
 
-> Status: v1 MVP selesai. Aplikasi bisa menjalankan CRUD dasar, filter tag, dan copy ke clipboard di semua modul.
+> Status: v1.5 — Label system selesai, core features berfungsi penuh.
 
 ## Tech Stack
 
 - Python 3.12+
 - [Flet](https://flet.dev) (UI, berbasis Flutter) — dikemas ke `.app` native lewat `flet build macos`
-- SQLite untuk data terstruktur (terletak di `~/Library/Application Support/DevCodex/devcodex.db`)
+- SQLite untuk data terstruktur
 - `keyring` untuk penyimpanan secret di macOS Keychain
 - `pytest` + `mypy` + `ruff` untuk testing & code quality
 
@@ -42,43 +42,50 @@ Output `.app` akan ada di folder `build/macos/`.
 
 ```
 devcodex/
-├── GEMINI.md              # instruksi agent (auto-discovery)
-├── .agents/rules/         # aturan tim & QA
-├── .agent/skills/         # custom skills
+├── GEMINI.md              # instruksi agent
 ├── pyproject.toml         # konfigurasi Python project
 ├── requirements.txt       # dependencies
 │
-├── docs/                  # dokumentasi & brand guidelines
+├── docs/                  # dokumentasi & user guides
 │   ├── README.md
 │   ├── brand_guidelines.md
-│   └── paper-trail/       # rencana implementasi per fitur
+│   ├── prompt-guide.md    # best practices menulis prompt
+│   ├── command-guide.md   # reference command umum
+│   └── api-reference-guide.md
 │
 ├── src/                   # kode sumber aplikasi
 │   ├── app/               # layer UI (Flet views, components, theme)
 │   │   ├── main.py        # entry point, routing
 │   │   ├── theme.py       # token warna/tipografi
-│   │   ├── components/    # sidebar, komponen reusable
-│   │   ├── views/         # 4 view modul (notes, prompts, commands, api_refs)
+│   │   ├── components/    # sidebar, shared cards
+│   │   ├── views/         # 4 view modul (labels, prompts, commands, api_refs)
 │   │   └── utils/         # clipboard helper
 │   └── core/              # layer logic (models, storage, search, security)
 │
-├── tests/                 # unit test, struktur mirror src/
-├── assets/                # aset visual (icon, dll.)
-└── data/                  # sample/vault lokal utk dev — DB asli di App Support
+├── tests/                 # unit test
+└── assets/                # aset visual (icon)
 ```
 
 ## Fitur Utama
 
 | Modul | Fitur |
 |---|---|
-| **Notes** | CRUD catatan bebas, copy konten, filter by tag |
-| **Prompts** | CRUD prompt AI, toggle favorit, copy, filter by tag |
-| **Commands** | CRUD command terminal, copy, filter by tag |
-| **API References** | CRUD API refs, reveal/copy key dari Keychain, filter by tag |
+| **Labels** | CRUD label dengan warna, segmented view items per label |
+| **Prompts** | CRUD prompt AI, copy, favorit, label assignment, duplicate |
+| **Commands** | CRUD command terminal, copy, label assignment, duplicate |
+| **API References** | CRUD API refs, copy URL/key dari Keychain, label assignment, duplicate |
 
-## Dokumen Penting
+## Fitur Tambahan
 
-- [`GEMINI.md`](../GEMINI.md) — spesifikasi & instruksi utama
-- [`brand_guidelines.md`](./brand_guidelines.md) — identitas visual
-- [`.agents/rules/`](../.agents/rules/) — standar kode, testing, keamanan, git workflow
-- [`paper-trail/`](./paper-trail/) — rencana & dokumentasi perubahan fitur
+- **Global Search** — cari lintas semua modul
+- **Sorting** — urutkan berdasarkan waktu atau nama
+- **Duplicate** — clone item dengan satu klik
+- **Keyboard Shortcuts** — Cmd+N (new), Cmd+F (search)
+- **Hover Effects** — visual feedback saat mouse hover
+
+## Dokumentasi
+
+- [`prompt-guide.md`](./prompt-guide.md) — best practices menulis prompt AI
+- [`command-guide.md`](./command-guide.md) — reference command terminal umum
+- [`api-reference-guide.md`](./api-reference-guide.md) — panduan API key management
+- [`brand_guidelines.md`](./brand_guidelines.md) — identitas visual & design system

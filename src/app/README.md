@@ -11,39 +11,40 @@ app/
 ├── utils/
 │   └── clipboard.py      # helper copy ke clipboard (pbcopy + ft.Clipboard fallback)
 ├── components/
-│   └── sidebar.py        # navigasi 4 section + branding + search global
+│   ├── sidebar.py        # navigasi 4 section + branding + search global
+│   └── cards.py          # shared UI: label_chip, action_button, copy_button, build_label_checkboxes
 ├── views/
 │   ├── base.py           # helper/abstract view sederhana
-│   ├── notes_view.py     # catatan bebas — full content display, copy, filter tag
-│   ├── prompts_view.py   # prompt AI — copy, toggle favorit, filter tag
-│   ├── commands_view.py  # command terminal — copy, filter tag
-│   └── api_refs_view.py  # referensi API — reveal key, copy, filter tag
+│   ├── labels_view.py    # label management + segmented view
+│   ├── prompts_view.py   # prompt AI — copy, toggle favorit, label assignment
+│   ├── commands_view.py  # command terminal — copy, label assignment
+│   └── api_refs_view.py  # referensi API — reveal key, copy, label assignment
 └── README.md
 ```
 
 ## Fitur Per Modul
 
-| Modul | Copy | Filter Tag | Catatan |
+| Modul | Copy | Labels | Catatan |
 |---|---|---|---|
-| Notes | ✓ | ✓ | Tampilan catatan bebas, konten penuh |
-| Prompts | ✓ | ✓ | Toggle favorit, tool/model badge |
-| Commands | ✓ | ✓ | Command text display monospace |
-| API References | ✓ | ✓ | Reveal API key dari Keychain |
+| Labels | — | CRUD | Segmented view: items grouped by label |
+| Prompts | ✓ | ✓ | Toggle favorit, tool/model badge, duplicate |
+| Commands | ✓ | ✓ | Command text display monospace, duplicate |
+| API References | ✓ | ✓ | Reveal API key dari Keychain, dual copy (URL + key), duplicate |
+
+## Shared Components (`cards.py`)
+
+Semua komponen reusable diekstrak ke `cards.py`:
+- `label_chip(label)` — chip kecil untuk menampilkan label
+- `action_button(icon, tooltip, on_click, danger)` — tombol aksi ikon
+- `copy_button(icon, tooltip, on_click)` — tombol copy dengan warna hijau
+- `build_label_checkboxes(labels, current_ids)` — bangun checkbox untuk form
+- `get_selected_label_ids(checks)` — ambil ID yang dipilih
+- `render_label_chips(labels)` — render baris label chips
 
 ## Menambah Halaman/Modul Baru
 
-1. Buat file baru di `views/`, komponen reusable taruh di `components/`.
-2. Ambil warna/font dari `theme.py` — jangan hardcode hex baru (lihat `../brand_guidelines.md`).
-3. Panggil logic lewat fungsi dari `core/` (mis. `core.notes.search_notes(...)`), bukan akses DB langsung.
-4. Jalankan smoke test manual: `python -m src.app.main`, pastikan tidak ada exception saat halaman dibuka.
-
-## Copy & Clipboard
-
-Semua modul memiliki tombol salin (📋) yang menggunakan `src/app/utils/clipboard.py`. Cara kerja:
-1. Coba `pbcopy` (native macOS) terlebih dahulu
-2. Fallback ke `ft.Clipboard()` jika pbcopy gagal
-3. Tampilkan SnackBar konfirmasi
-
-## Filter Tag
-
-Semua modul mendukung filter tag dengan mengklik chip tag di setiap kartu. Mengklik chip yang sama akan menghapus filter.
+1. Buat file baru di `views/`, gunakan `BaseView` sebagai parent class
+2. Gunakan komponen dari `cards.py` untuk UI yang konsisten
+3. Ambil warna/font dari `theme.py` — jangan hardcode hex baru
+4. Panggil logic lewat fungsi dari `core/` — bukan akses DB langsung
+5. Tambahkan hover effect dengan `_hover_card(e)` function

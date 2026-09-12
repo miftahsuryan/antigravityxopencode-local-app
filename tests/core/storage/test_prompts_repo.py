@@ -64,3 +64,21 @@ def test_favorite_flag(conn: sqlite3.Connection) -> None:
     fetched = get_prompt(conn, saved.id)  # type: ignore[arg-type]
     assert fetched is not None
     assert fetched.is_favorite is True
+
+
+def test_label_ids_populated_on_read(conn: sqlite3.Connection) -> None:
+    """label_ids harus terisi saat membaca dari DB."""
+    from src.core.models import Label
+    from src.core.storage.labels_repo import create_label, set_item_labels
+
+    label = create_label(conn, Label(id=None, name="TestLabel"))
+    prompt = create_prompt(conn, Prompt(id=None, title="T", content="c"))
+    set_item_labels(conn, "prompts", prompt.id, [label.id])  # type: ignore[arg-type]
+
+    fetched = get_prompt(conn, prompt.id)  # type: ignore[arg-type]
+    assert fetched is not None
+    assert label.id in fetched.label_ids
+
+
+def test_get_nonexistent_returns_none(conn: sqlite3.Connection) -> None:
+    assert get_prompt(conn, 9999) is None

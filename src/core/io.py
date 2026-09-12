@@ -16,60 +16,72 @@ from src.core.storage import (
     prompts_repo,
 )
 
-EXPORT_VERSION = "1.6"
+EXPORT_VERSION = "1.7"
 
 
-def export_to_json(conn: sqlite3.Connection, file_path: Path) -> None:
-    """Export semua data ke file JSON."""
-    labels_data: list[dict[str, str]] = []
+def export_label_to_json(
+    conn: sqlite3.Connection, file_path: Path, label_id: int
+) -> str:
+    """Export data untuk satu label ke file JSON.
+
+    Args:
+        conn: koneksi SQLite.
+        file_path: path ke file output.
+        label_id: ID label yang akan diexport.
+
+    Returns:
+        Nama label yang diexport.
+    """
+    label = labels_repo.get_label(conn, label_id)
+    if not label:
+        raise ValueError(f"Label dengan ID {label_id} tidak ditemukan")
+
+    # Ambil items yang terkait dengan label ini
+    prompt_ids = labels_repo.get_items_by_label(conn, label_id, "prompts")
+    cmd_ids = labels_repo.get_items_by_label(conn, label_id, "commands")
+    api_ids = labels_repo.get_items_by_label(conn, label_id, "api_refs")
+
     prompts_data: list[dict[str, Any]] = []
+    for pid in prompt_ids:
+        p = prompts_repo.get_prompt(conn, pid)
+        if p:
+            prompts_data.append({
+                "title": p.title,
+                "content": p.content,
+                "tool": p.tool,
+                "is_favorite": p.is_favorite,
+            })
+
     commands_data: list[dict[str, Any]] = []
+    for cid in cmd_ids:
+        c = commands_repo.get_command(conn, cid)
+        if c:
+            commands_data.append({
+                "title": c.title,
+                "command_text": c.command_text,
+                "description": c.description,
+            })
+
     api_refs_data: list[dict[str, Any]] = []
-
-    for label in labels_repo.list_labels(conn):
-        labels_data.append({
-            "name": label.name,
-            "color": label.color,
-            "description": label.description,
-        })
-
-    for prompt in prompts_repo.list_prompts(conn):
-        pid = prompt.id if prompt.id is not None else 0
-        labels = labels_repo.get_labels_for_item(conn, "prompts", pid)
-        prompts_data.append({
-            "title": prompt.title,
-            "content": prompt.content,
-            "tool": prompt.tool,
-            "is_favorite": prompt.is_favorite,
-            "label_names": [lb.name for lb in labels],
-        })
-
-    for cmd in commands_repo.list_commands(conn):
-        cid = cmd.id if cmd.id is not None else 0
-        labels = labels_repo.get_labels_for_item(conn, "commands", cid)
-        commands_data.append({
-            "title": cmd.title,
-            "command_text": cmd.command_text,
-            "description": cmd.description,
-            "label_names": [lb.name for lb in labels],
-        })
-
-    for ref in api_refs_repo.list_api_refs(conn):
-        rid = ref.id if ref.id is not None else 0
-        labels = labels_repo.get_labels_for_item(conn, "api_refs", rid)
-        api_refs_data.append({
-            "service_name": ref.service_name,
-            "base_url": ref.base_url,
-            "description": ref.description,
-            "auth_type": ref.auth_type,
-            "keychain_key_name": ref.keychain_key_name,
-            "label_names": [lb.name for lb in labels],
-        })
+    for rid in api_ids:
+        r = api_refs_repo.get_api_ref(conn, rid)
+        if r:
+            api_refs_data.append({
+                "service_name": r.service_name,
+                "base_url": r.base_url,
+                "description": r.description,
+                "auth_type": r.auth_type,
+                "keychain_key_name": r.keychain_key_name,
+            })
 
     data = {
         "version": EXPORT_VERSION,
         "exported_at": datetime.now().isoformat(),
-        "labels": labels_data,
+        "label": {
+            "name": label.name,
+            "color": label.color,
+            "description": label.description,
+        },
         "prompts": prompts_data,
         "commands": commands_data,
         "api_refs": api_refs_data,
@@ -77,65 +89,50 @@ def export_to_json(conn: sqlite3.Connection, file_path: Path) -> None:
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    return label.name
 
 
-def import_from_json(
-    conn: sqlite3.Connection, file_path: Path, merge: bool = True
+def import_label_from_json(
+    conn: sqlite3.Connection, file_path: Path
 ) -> dict[str, int]:
-    """Import data dari file JSON.
+    """Import data dari file JSON per-label.
 
     Args:
         conn: koneksi SQLite.
         file_path: path ke file input.
-        merge: True = skip duplikat, False = clear semua lalu import.
 
     Returns:
         Dict dengan jumlah item yang diimport per modul.
     """
     raw = json.loads(file_path.read_text())
-    counts = {"labels": 0, "prompts": 0, "commands": 0, "api_refs": 0}
+    counts = {"prompts": 0, "commands": 0, "api_refs": 0}
 
-    if not merge:
-        _clear_all(conn)
+    # Buat atau dapatkan label
+    label_info = raw.get("label", {})
+    label_name = label_info.get("name", "Imported")
+    existing = labels_repo.list_labels(conn)
+    label = None
+    for lb in existing:
+        if lb.name == label_name:
+            label = lb
+            break
 
-    # Import labels first (butuh ID untuk mapping)
-    label_map: dict[str, int] = {}
-    existing_labels = {lb.name: lb for lb in labels_repo.list_labels(conn)}
-
-    for item in raw.get("labels", []):
-        name = item["name"]
-        if merge and name in existing_labels:
-            lid = existing_labels[name].id
-            if lid is not None:
-                label_map[name] = lid
-            continue
+    if not label:
         label = labels_repo.create_label(
             conn,
             Label(
                 id=None,
-                name=name,
-                color=item.get("color", "#6C8CFF"),
-                description=item.get("description", ""),
+                name=label_name,
+                color=label_info.get("color", "#6C8CFF"),
+                description=label_info.get("description", ""),
             ),
         )
-        if label.id is not None:
-            label_map[name] = label.id
-        counts["labels"] += 1
 
-    # Re-fetch after creating new labels
-    if not merge:
-        for lb in labels_repo.list_labels(conn):
-            if lb.id is not None:
-                label_map[lb.name] = lb.id
+    assert label.id is not None
 
     # Import prompts
     for item in raw.get("prompts", []):
-        label_ids = [
-            label_map[name]
-            for name in item.get("label_names", [])
-            if name in label_map
-        ]
-        prompts_repo.create_prompt(
+        p = prompts_repo.create_prompt(
             conn,
             Prompt(
                 id=None,
@@ -143,38 +140,30 @@ def import_from_json(
                 content=item.get("content", ""),
                 tool=item.get("tool", ""),
                 is_favorite=item.get("is_favorite", False),
-                label_ids=label_ids,
             ),
         )
+        if p.id is not None:
+            labels_repo.set_item_labels(conn, "prompts", p.id, [label.id])
         counts["prompts"] += 1
 
     # Import commands
     for item in raw.get("commands", []):
-        label_ids = [
-            label_map[name]
-            for name in item.get("label_names", [])
-            if name in label_map
-        ]
-        commands_repo.create_command(
+        c = commands_repo.create_command(
             conn,
             Command(
                 id=None,
                 title=item["title"],
                 command_text=item.get("command_text", ""),
                 description=item.get("description", ""),
-                label_ids=label_ids,
             ),
         )
+        if c.id is not None:
+            labels_repo.set_item_labels(conn, "commands", c.id, [label.id])
         counts["commands"] += 1
 
-    # Import API refs (TANPA keychain secret — secret harus diimpor manual)
+    # Import API refs (TANPA keychain secret)
     for item in raw.get("api_refs", []):
-        label_ids = [
-            label_map[name]
-            for name in item.get("label_names", [])
-            if name in label_map
-        ]
-        api_refs_repo.create_api_ref(
+        r = api_refs_repo.create_api_ref(
             conn,
             ApiRef(
                 id=None,
@@ -183,19 +172,10 @@ def import_from_json(
                 description=item.get("description", ""),
                 auth_type=item.get("auth_type", ""),
                 keychain_key_name=item.get("keychain_key_name", ""),
-                label_ids=label_ids,
             ),
         )
+        if r.id is not None:
+            labels_repo.set_item_labels(conn, "api_refs", r.id, [label.id])
         counts["api_refs"] += 1
 
     return counts
-
-
-def _clear_all(conn: sqlite3.Connection) -> None:
-    """Hapus semua data dari semua tabel."""
-    conn.execute("DELETE FROM label_items")
-    conn.execute("DELETE FROM prompts")
-    conn.execute("DELETE FROM commands")
-    conn.execute("DELETE FROM api_refs")
-    conn.execute("DELETE FROM labels")
-    conn.commit()

@@ -182,7 +182,7 @@ class PromptsView(BaseView):
                 PALETTE["accent.primary"] if md_preview.visible
                 else PALETTE["text.secondary"]
             )
-            e.control.update()
+            self.page.update()
 
         return ft.Container(
             content=ft.Column(

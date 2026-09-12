@@ -14,8 +14,9 @@ from src.app.views.base import BaseView
 from src.app.views.commands_view import CommandsView
 from src.app.views.labels_view import LabelsView
 from src.app.views.prompts_view import PromptsView
-from src.core.io import export_to_json, import_from_json
+from src.core.io import export_label_to_json, import_label_from_json
 from src.core.search import SearchResult, search_all
+from src.core.storage import labels_repo
 from src.core.storage.db import init_db
 
 
@@ -106,38 +107,87 @@ class DevCodexApp:
             self._export_data()
 
     def _export_data(self) -> None:
-        """Export semua data ke JSON file."""
-        from pathlib import Path
+        """Tampilkan dialog pilih label untuk export."""
+        labels = labels_repo.list_labels(self.conn)
+        if not labels:
+            snack = ft.SnackBar(
+                ft.Text("Belum ada label. Buat label terlebih dahulu."),
+                bgcolor="#F5A623",
+            )
+            self.page.overlay.append(snack)
+            snack.open = True
+            self.page.update()
+            return
 
-        desktop = Path.home() / "Desktop"
-        file_path = desktop / "devcodex_export.json"
-        try:
-            export_to_json(self.conn, file_path)
-            snack = ft.SnackBar(
-                ft.Text(f"Data diekspor ke {file_path}"),
-                bgcolor="#3DDC84",
-            )
-            self.page.overlay.append(snack)
-            snack.open = True
-            self.page.update()
-        except Exception as ex:
-            snack = ft.SnackBar(
-                ft.Text(f"Gagal export: {ex}"),
-                bgcolor="#F5484B",
-            )
-            self.page.overlay.append(snack)
-            snack.open = True
-            self.page.update()
+        label_options = [
+            ft.dropdown.Option(str(lb.id), lb.name) for lb in labels
+        ]
+        label_dropdown = ft.Dropdown(
+            label="Pilih Label",
+            options=label_options,
+            dense=True,
+        )
+
+        def _do_export(e: Any) -> None:
+            label_id_str = label_dropdown.value
+            if not label_id_str:
+                return
+            label_id = int(label_id_str)
+            from pathlib import Path
+
+            desktop = Path.home() / "Desktop"
+            label = labels_repo.get_label(self.conn, label_id)
+            safe_name = (label.name if label else "export").replace(" ", "_")
+            file_path = desktop / f"devcodex_{safe_name}.json"
+            try:
+                export_label_to_json(self.conn, file_path, label_id)
+                self.page.pop_dialog()
+                label_name = label.name if label else "Unknown"
+                snack = ft.SnackBar(
+                    ft.Text(f"Label '{label_name}' diekspor ke {file_path}"),
+                    bgcolor="#3DDC84",
+                )
+                self.page.overlay.append(snack)
+                snack.open = True
+                self.page.update()
+            except Exception as ex:
+                snack = ft.SnackBar(
+                    ft.Text(f"Gagal export: {ex}"),
+                    bgcolor="#F5484B",
+                )
+                self.page.overlay.append(snack)
+                snack.open = True
+                self.page.update()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Export Label"),
+            content=ft.Column(
+                [
+                    ft.Text("Pilih label yang akan diexport:"),
+                    label_dropdown,
+                ],
+                spacing=8,
+                tight=True,
+            ),
+            actions=[
+                ft.TextButton("Batal", on_click=lambda e: self.page.pop_dialog()),
+                ft.FilledButton("Export", on_click=_do_export),
+            ],
+        )
+        self.page.show_dialog(dialog)
 
     def _import_data(self) -> None:
-        """Import data dari JSON file."""
+        """Import data dari JSON file ke label baru."""
         from pathlib import Path
 
         desktop = Path.home() / "Desktop"
-        file_path = desktop / "devcodex_export.json"
-        if not file_path.exists():
+
+        # Cari file yang tersedia
+        json_files = list(desktop.glob("devcodex_*.json"))
+        if not json_files:
             snack = ft.SnackBar(
-                ft.Text(f"File {file_path} tidak ditemukan."),
+                ft.Text(f"File export tidak ditemukan di {desktop}"),
                 bgcolor="#F5484B",
             )
             self.page.overlay.append(snack)
@@ -145,12 +195,23 @@ class DevCodexApp:
             self.page.update()
             return
 
-        def _confirm_import(e: Any) -> None:
+        file_options = [
+            ft.dropdown.Option(str(f), f.name) for f in json_files
+        ]
+        file_dropdown = ft.Dropdown(
+            label="Pilih file",
+            options=file_options,
+            dense=True,
+        )
+
+        def _do_import(e: Any) -> None:
+            selected = file_dropdown.value
+            if not selected:
+                return
+            import_path = Path(selected)
             try:
-                counts = import_from_json(self.conn, file_path, merge=True)
+                counts = import_label_from_json(self.conn, import_path)
                 self.page.pop_dialog()
-                for key in self.views:
-                    self.views[key].refresh()
                 self._navigate(self.current_key)
                 total = sum(counts.values())
                 snack = ft.SnackBar(
@@ -172,14 +233,18 @@ class DevCodexApp:
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Import Data"),
-            content=ft.Text(
-                f"Import data dari {file_path}?\n"
-                "Data yang sudah ada akan di-skip (merge mode)."
+            title=ft.Text("Import Label"),
+            content=ft.Column(
+                [
+                    ft.Text("Pilih file JSON yang akan diimport:"),
+                    file_dropdown,
+                ],
+                spacing=8,
+                tight=True,
             ),
             actions=[
                 ft.TextButton("Batal", on_click=lambda e: self.page.pop_dialog()),
-                ft.FilledButton("Import", on_click=_confirm_import),
+                ft.FilledButton("Import", on_click=_do_import),
             ],
         )
         self.page.show_dialog(dialog)

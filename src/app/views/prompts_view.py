@@ -13,6 +13,7 @@ from src.app.components.cards import (
     get_selected_label_ids,
     render_label_chips,
 )
+from src.app.components.markdown_view import render_markdown
 from src.app.theme import PALETTE
 from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
@@ -159,6 +160,30 @@ class PromptsView(BaseView):
         )
         labels = labels_repo.get_labels_for_item(self.conn, "prompts", prompt.id)  # type: ignore[arg-type]
 
+        # Content preview (truncated)
+        content_preview = ft.Text(
+            (prompt.content or "")[:120]
+            + ("…" if prompt.content and len(prompt.content) > 120 else ""),
+            size=12,
+            color=PALETTE["text.secondary"],
+            max_lines=2,
+        )
+
+        # Markdown preview (hidden by default)
+        md_preview = ft.Container(
+            content=render_markdown(prompt.content or ""),
+            visible=False,
+        )
+
+        def _toggle_preview(e: ft.ControlEvent) -> None:
+            md_preview.visible = not md_preview.visible
+            content_preview.visible = not md_preview.visible
+            e.control.icon_color = (  # type: ignore[attr-defined]
+                PALETTE["accent.primary"] if md_preview.visible
+                else PALETTE["text.secondary"]
+            )
+            e.control.update()
+
         return ft.Container(
             content=ft.Column(
                 [
@@ -183,6 +208,12 @@ class PromptsView(BaseView):
                                 tooltip="Copy",
                                 on_click=lambda e, p=prompt: self._copy(p),
                             ),
+                            ft.IconButton(
+                                icon=ft.Icons.PREVIEW,
+                                icon_color=PALETTE["text.secondary"],
+                                tooltip="Preview Markdown",
+                                on_click=_toggle_preview,  # type: ignore[arg-type]
+                            ),
                             action_button(
                                 ft.Icons.COPY_ALL_OUTLINED,
                                 "Duplicate",
@@ -203,13 +234,8 @@ class PromptsView(BaseView):
                         spacing=4,
                     ),
                     render_label_chips(labels),
-                    ft.Text(
-                        (prompt.content or "")[:120]
-                        + ("…" if prompt.content and len(prompt.content) > 120 else ""),
-                        size=12,
-                        color=PALETTE["text.secondary"],
-                        max_lines=2,
-                    ),
+                    content_preview,
+                    md_preview,
                     ft.Container(
                         content=ft.Text(
                             prompt.tool,

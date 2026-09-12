@@ -6,15 +6,21 @@ import sqlite3
 from datetime import datetime
 
 from src.core.models import Command
-from src.core.storage.labels_repo import set_item_labels
+from src.core.storage.labels_repo import get_item_label_ids, set_item_labels
 
 
-def _row_to_command(row: sqlite3.Row) -> Command:
+def _row_to_command(
+    row: sqlite3.Row, conn: sqlite3.Connection | None = None
+) -> Command:
+    label_ids: list[int] = []
+    if conn and row["id"]:
+        label_ids = get_item_label_ids(conn, "commands", row["id"])
     return Command(
         id=row["id"],
         title=row["title"],
         command_text=row["command_text"],
         description=row["description"],
+        label_ids=label_ids,
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
     )
@@ -31,19 +37,18 @@ def create_command(conn: sqlite3.Connection, cmd: Command) -> Command:
     assert item_id is not None
     if cmd.label_ids:
         set_item_labels(conn, "commands", item_id, cmd.label_ids)
-    return _row_to_command(
-        conn.execute("SELECT * FROM commands WHERE id = ?", (item_id,)).fetchone()
-    )
+    row = conn.execute("SELECT * FROM commands WHERE id = ?", (item_id,)).fetchone()
+    return _row_to_command(row, conn)
 
 
 def list_commands(conn: sqlite3.Connection) -> list[Command]:
     rows = conn.execute("SELECT * FROM commands ORDER BY updated_at DESC").fetchall()
-    return [_row_to_command(r) for r in rows]
+    return [_row_to_command(r, conn) for r in rows]
 
 
 def get_command(conn: sqlite3.Connection, cmd_id: int) -> Command | None:
     row = conn.execute("SELECT * FROM commands WHERE id = ?", (cmd_id,)).fetchone()
-    return _row_to_command(row) if row else None
+    return _row_to_command(row, conn) if row else None
 
 
 def update_command(conn: sqlite3.Connection, cmd: Command) -> Command | None:

@@ -1,8 +1,15 @@
 """Helper untuk copy ke clipboard — gabungan pbcopy + ft.Clipboard."""
 
 import subprocess
+from typing import TYPE_CHECKING
 
 import flet as ft
+
+if TYPE_CHECKING:
+    pass
+
+# Snackbar singleton — di-reuse untuk menghindari memory leak.
+_snack: ft.SnackBar | None = None
 
 
 def copy_to_clipboard(
@@ -15,6 +22,7 @@ def copy_to_clipboard(
         text: Teks yang akan disalin.
         message: Pesan untuk SnackBar.
     """
+    global _snack
     copied = False
     try:
         subprocess.run(
@@ -31,16 +39,16 @@ def copy_to_clipboard(
     ):
         copied = False
 
+    if _snack is None:
+        _snack = ft.SnackBar(ft.Text(""), bgcolor="#3DDC84")
+        page.overlay.append(_snack)
+
     if copied:
-        snack = ft.SnackBar(ft.Text(message), bgcolor="#3DDC84")
-        page.overlay.append(snack)
-        snack.open = True
-        page.update()
+        _snack.content = ft.Text(message)
+        _snack.bgcolor = "#3DDC84"
     else:
-        snack = ft.SnackBar(
-            ft.Text("Gagal menyalin ke clipboard."),
-            bgcolor="#F5484B",
-        )
-        page.overlay.append(snack)
-        snack.open = True
-        page.update()
+        _snack.content = ft.Text("Gagal menyalin ke clipboard.")
+        _snack.bgcolor = "#F5484B"
+
+    _snack.open = True
+    page.update()

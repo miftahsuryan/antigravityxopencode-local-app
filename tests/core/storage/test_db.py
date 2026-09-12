@@ -32,9 +32,9 @@ def test_init_db_creates_tables(tmp_db: sqlite3.Connection) -> None:
 
 
 def test_user_version_is_set(tmp_db: sqlite3.Connection) -> None:
-    """PRAGMA user_version harus 4 setelah migrasi."""
+    """PRAGMA user_version harus 1 setelah migrasi."""
     (version,) = tmp_db.execute("PRAGMA user_version").fetchone()
-    assert version == 4
+    assert version == 1
 
 
 def test_migration_idempotent(tmp_path: Path) -> None:
@@ -42,7 +42,7 @@ def test_migration_idempotent(tmp_path: Path) -> None:
     conn = init_db(tmp_path / "test.db")
     run_migrations(conn)
     (version,) = conn.execute("PRAGMA user_version").fetchone()
-    assert version == 4
+    assert version == 1
     conn.close()
 
 

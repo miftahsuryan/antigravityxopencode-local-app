@@ -64,6 +64,9 @@ class DevCodexApp:
         self.content_area.content = view.build()
         self.page.update()
 
+    def _open_result(self, module: str, title: str) -> None:
+        self._navigate(module)
+
     def _on_keyboard(self, e: ft.KeyboardEvent) -> None:
         if e.key == "N" and e.meta:
             view = self.views.get(self.current_key)
@@ -162,7 +165,7 @@ class DevCodexApp:
             border=ft.Border.all(1, PALETTE["border.subtle"]),
             border_radius=8,
             padding=12,
-            on_click=lambda e, k=r.module: self._navigate(k),
+            on_click=lambda e, k=r.module, t=r.title: self._open_result(k, t),
             ink=True,
         )
 

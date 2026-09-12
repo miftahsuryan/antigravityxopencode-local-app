@@ -7,6 +7,12 @@ from typing import Any
 
 import flet as ft
 
+from src.app.components.cards import (
+    action_button,
+    build_label_checkboxes,
+    get_selected_label_ids,
+    render_label_chips,
+)
 from src.app.theme import PALETTE
 from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
@@ -38,11 +44,7 @@ class PromptsView(BaseView):
                 title=f"{prompt.title} (copy)",
                 content=prompt.content,
                 tool=prompt.tool,
-                label_ids=[
-                    lb.id for lb in labels_repo.get_labels_for_item(
-                        self.conn, "prompts", prompt.id  # type: ignore[arg-type]
-                    ) if lb.id is not None
-                ],
+                label_ids=list(prompt.label_ids),
             ),
         )
         self.refresh()
@@ -67,27 +69,12 @@ class PromptsView(BaseView):
 
         all_labels = labels_repo.list_labels(self.conn)
         current_label_ids = prompt.label_ids if prompt else []
-        label_checks: list[ft.Checkbox] = []
-        for lb in all_labels:
-            label_checks.append(
-                ft.Checkbox(
-                    label=lb.name,
-                    value=lb.id in current_label_ids,
-                    data=lb.id,
-                )
-            )
-        label_section = ft.Column(
-            controls=label_checks, spacing=2, scroll=ft.ScrollMode.AUTO  # type: ignore[arg-type]
-        ) if label_checks else ft.Text(
-            "Belum ada label. Buat di halaman Labels.",
-            size=12,
-            color=PALETTE["text.secondary"],
+        label_checks, label_section = build_label_checkboxes(
+            all_labels, current_label_ids
         )
 
         def _save(e: Any) -> None:
-            selected_ids = [
-                cb.data for cb in label_checks if cb.value  # type: ignore[attr-defined]
-            ]
+            selected_ids = get_selected_label_ids(label_checks)
             if is_edit and prompt:
                 prompt.title = (title_field.value or "").strip()
                 prompt.content = content_field.value or ""
@@ -171,9 +158,6 @@ class PromptsView(BaseView):
             else PALETTE["text.secondary"]
         )
         labels = labels_repo.get_labels_for_item(self.conn, "prompts", prompt.id)  # type: ignore[arg-type]
-        label_chips = ft.Row(
-            [_label_chip(lb) for lb in labels], spacing=4
-        ) if labels else ft.Container()
 
         return ft.Container(
             content=ft.Column(
@@ -199,17 +183,17 @@ class PromptsView(BaseView):
                                 tooltip="Copy",
                                 on_click=lambda e, p=prompt: self._copy(p),
                             ),
-                            _action_button(
+                            action_button(
                                 ft.Icons.COPY_ALL_OUTLINED,
                                 "Duplicate",
                                 lambda e, p=prompt: self._duplicate(p),
                             ),
-                            _action_button(
+                            action_button(
                                 ft.Icons.EDIT_OUTLINED,
                                 "Edit",
                                 lambda e, p=prompt: self._open_edit(p),
                             ),
-                            _action_button(
+                            action_button(
                                 ft.Icons.DELETE_OUTLINE,
                                 "Hapus",
                                 lambda e, p=prompt: self._delete(p),
@@ -218,7 +202,7 @@ class PromptsView(BaseView):
                         ],
                         spacing=4,
                     ),
-                    label_chips,
+                    render_label_chips(labels),
                     ft.Text(
                         (prompt.content or "")[:120]
                         + ("…" if prompt.content and len(prompt.content) > 120 else ""),
@@ -243,6 +227,7 @@ class PromptsView(BaseView):
             border=ft.Border.all(1, PALETTE["border.subtle"]),
             border_radius=8,
             padding=12,
+            on_hover=lambda e: _hover_card(e),
         )
 
     def _copy(self, prompt: Prompt) -> None:
@@ -251,21 +236,12 @@ class PromptsView(BaseView):
         )
 
 
-def _label_chip(label: Any) -> ft.Container:
-    return ft.Container(
-        content=ft.Text(label.name, size=10, color=PALETTE["bg.base"]),
-        bgcolor=label.color,
-        padding=ft.Padding.symmetric(horizontal=6, vertical=1),
-        border_radius=4,
-    )
-
-
-def _action_button(
-    icon: Any, tooltip: str, on_click: Any, danger: bool = False
-) -> ft.IconButton:
-    return ft.IconButton(
-        icon=icon,
-        icon_color=PALETTE["state.danger"] if danger else PALETTE["text.secondary"],
-        tooltip=tooltip,
-        on_click=on_click,
-    )
+def _hover_card(e: ft.ControlEvent) -> None:
+    """Efek hover pada kartu."""
+    ctrl = e.control
+    if e.data == "true":
+        ctrl.bgcolor = PALETTE["bg.surface-hover"]  # type: ignore[attr-defined]
+        ctrl.update()
+    else:
+        ctrl.bgcolor = PALETTE["bg.surface"]  # type: ignore[attr-defined]
+        ctrl.update()

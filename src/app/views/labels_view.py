@@ -11,6 +11,7 @@ from typing import Any
 
 import flet as ft
 
+from src.app.components.cards import action_button, copy_button, label_chip
 from src.app.theme import PALETTE
 from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
@@ -166,6 +167,9 @@ class LabelsView(BaseView):
     def refresh(self) -> None:
         labels = labels_repo.list_labels(self.conn)
         counts = labels_repo.get_label_item_counts(self.conn)
+        all_prompts = prompts_repo.list_prompts(self.conn)
+        all_commands = commands_repo.list_commands(self.conn)
+        all_api_refs = api_refs_repo.list_api_refs(self.conn)
         self.list_area.controls.clear()
 
         if not labels:
@@ -176,16 +180,22 @@ class LabelsView(BaseView):
             for lb in labels:
                 item_counts = counts.get(lb.id, {}) if lb.id else {}
                 self.list_area.controls.append(
-                    self._label_section(lb, item_counts)
+                    self._label_section(
+                        lb, item_counts,
+                        all_prompts, all_commands, all_api_refs,
+                    )
                 )
         self.page.update()
 
-    def _label_section(self, label: Label, item_counts: dict[str, int]) -> ft.Container:
+    def _label_section(
+        self,
+        label: Label,
+        item_counts: dict[str, int],
+        all_prompts: list[Prompt],
+        all_commands: list[Command],
+        all_api_refs: list[ApiRef],
+    ) -> ft.Container:
         total = sum(item_counts.values())
-
-        prompts = prompts_repo.list_prompts(self.conn)
-        commands = commands_repo.list_commands(self.conn)
-        api_refs = api_refs_repo.list_api_refs(self.conn)
 
         label_prompt_ids = set(
             labels_repo.get_items_by_label(self.conn, label.id, "prompts")  # type: ignore[arg-type]
@@ -197,9 +207,9 @@ class LabelsView(BaseView):
             labels_repo.get_items_by_label(self.conn, label.id, "api_refs")  # type: ignore[arg-type]
         )
 
-        filtered_prompts = [p for p in prompts if p.id in label_prompt_ids]
-        filtered_commands = [c for c in commands if c.id in label_cmd_ids]
-        filtered_api_refs = [r for r in api_refs if r.id in label_api_ids]
+        filtered_prompts = [p for p in all_prompts if p.id in label_prompt_ids]
+        filtered_commands = [c for c in all_commands if c.id in label_cmd_ids]
+        filtered_api_refs = [r for r in all_api_refs if r.id in label_api_ids]
 
         content_controls: list[ft.Control] = []
 
@@ -252,12 +262,12 @@ class LabelsView(BaseView):
                     color=PALETTE["text.secondary"],
                 ),
                 ft.Container(expand=True),
-                _action_button(
+                action_button(
                     ft.Icons.EDIT_OUTLINED,
                     "Edit",
                     lambda e, lb=label: self._open_edit(lb),
                 ),
-                _action_button(
+                action_button(
                     ft.Icons.DELETE_OUTLINE,
                     "Hapus",
                     lambda e, lb=label: self._delete(lb),
@@ -286,7 +296,7 @@ class LabelsView(BaseView):
     def _prompt_item(self, p: Prompt) -> ft.Container:
         labels = labels_repo.get_labels_for_item(self.conn, "prompts", p.id)  # type: ignore[arg-type]
         label_chips = ft.Row(
-            [_label_chip(lb) for lb in labels], spacing=4
+            [label_chip(lb) for lb in labels], spacing=4
         ) if labels else ft.Container()
 
         return ft.Container(
@@ -294,13 +304,12 @@ class LabelsView(BaseView):
                 [
                     ft.Row(
                         [
-                            ft.IconButton(
-                                icon=ft.Icons.CONTENT_COPY,
-                                icon_color=PALETTE["text.secondary"],
-                                tooltip="Copy",
-                                on_click=lambda e, prompt=p: copy_to_clipboard(
-                                    self.page, prompt.content,
-                                    f'Prompt "{prompt.title}" disalin.',
+                            copy_button(
+                                ft.Icons.CONTENT_COPY,
+                                "Copy",
+                                lambda: copy_to_clipboard(
+                                    self.page, p.content,
+                                    f'Prompt "{p.title}" disalin.',
                                 ),
                             ),
                             ft.Text(
@@ -343,7 +352,7 @@ class LabelsView(BaseView):
     def _command_item(self, cmd: Command) -> ft.Container:
         labels = labels_repo.get_labels_for_item(self.conn, "commands", cmd.id)  # type: ignore[arg-type]
         label_chips = ft.Row(
-            [_label_chip(lb) for lb in labels], spacing=4
+            [label_chip(lb) for lb in labels], spacing=4
         ) if labels else ft.Container()
 
         return ft.Container(
@@ -388,7 +397,7 @@ class LabelsView(BaseView):
     def _api_item(self, ref: ApiRef) -> ft.Container:
         labels = labels_repo.get_labels_for_item(self.conn, "api_refs", ref.id)  # type: ignore[arg-type]
         label_chips = ft.Row(
-            [_label_chip(lb) for lb in labels], spacing=4
+            [label_chip(lb) for lb in labels], spacing=4
         ) if labels else ft.Container()
 
         return ft.Container(
@@ -434,23 +443,3 @@ class LabelsView(BaseView):
             self.page, target,
             f'API key "{ref.service_name}" disalin!',
         )
-
-
-def _label_chip(label: Label) -> ft.Container:
-    return ft.Container(
-        content=ft.Text(label.name, size=10, color=PALETTE["bg.base"]),
-        bgcolor=label.color,
-        padding=ft.Padding.symmetric(horizontal=6, vertical=1),
-        border_radius=4,
-    )
-
-
-def _action_button(
-    icon: Any, tooltip: str, on_click: Any, danger: bool = False
-) -> ft.IconButton:
-    return ft.IconButton(
-        icon=icon,
-        icon_color=PALETTE["state.danger"] if danger else PALETTE["text.secondary"],
-        tooltip=tooltip,
-        on_click=on_click,
-    )

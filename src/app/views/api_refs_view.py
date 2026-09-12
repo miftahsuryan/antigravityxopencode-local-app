@@ -7,6 +7,13 @@ from typing import Any
 
 import flet as ft
 
+from src.app.components.cards import (
+    action_button,
+    build_label_checkboxes,
+    copy_button,
+    get_selected_label_ids,
+    render_label_chips,
+)
 from src.app.theme import PALETTE
 from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
@@ -19,7 +26,9 @@ class ApiRefsView(BaseView):
     """View untuk CRUD API reference."""
 
     def __init__(self, page: ft.Page, conn: sqlite3.Connection) -> None:
-        super().__init__(page, "API References", ft.Icons.CODE_OUTLINED, self._open_add)
+        super().__init__(
+            page, "API References", ft.Icons.CODE_OUTLINED, self._open_add
+        )
         self.conn = conn
         self.refresh()
 
@@ -39,11 +48,7 @@ class ApiRefsView(BaseView):
                 description=ref.description,
                 auth_type=ref.auth_type,
                 keychain_key_name="",
-                label_ids=[
-                    lb.id for lb in labels_repo.get_labels_for_item(
-                        self.conn, "api_refs", ref.id  # type: ignore[arg-type]
-                    ) if lb.id is not None
-                ],
+                label_ids=list(ref.label_ids),
             ),
         )
         self.refresh()
@@ -81,12 +86,12 @@ class ApiRefsView(BaseView):
             dense=True,
         )
         keychain_field = ft.TextField(
-            label="Nama key di Keychain (untuk secret)",
+            label="Nama key di Keychain",
             value=ref.keychain_key_name if ref else "",
             dense=True,
         )
         secret_field = ft.TextField(
-            label="Secret value (opsional, disimpan di Keychain)",
+            label="Secret value (disimpan di Keychain)",
             password=True,
             can_reveal_password=True,
             dense=True,
@@ -98,27 +103,12 @@ class ApiRefsView(BaseView):
 
         all_labels = labels_repo.list_labels(self.conn)
         current_label_ids = ref.label_ids if ref else []
-        label_checks: list[ft.Control] = []
-        for lb in all_labels:
-            label_checks.append(
-                ft.Checkbox(
-                    label=lb.name,
-                    value=lb.id in current_label_ids,
-                    data=lb.id,
-                )
-            )
-        label_section = ft.Column(
-            label_checks, spacing=2, scroll=ft.ScrollMode.AUTO  # type: ignore[arg-type]
-        ) if label_checks else ft.Text(
-            "Belum ada label. Buat di halaman Labels.",
-            size=12,
-            color=PALETTE["text.secondary"],
+        label_checks, label_section = build_label_checkboxes(
+            all_labels, current_label_ids
         )
 
         def _save(e: Any) -> None:
-            selected_ids = [
-                cb.data for cb in label_checks if cb.value  # type: ignore[attr-defined]
-            ]
+            selected_ids = get_selected_label_ids(label_checks)
             keychain_name = (keychain_field.value or "").strip()
             if is_edit and ref:
                 ref.service_name = (name_field.value or "").strip()
@@ -214,11 +204,9 @@ class ApiRefsView(BaseView):
 
     def _item_card(self, ref: ApiRef) -> ft.Container:
         secret_value = get_secret(ref.keychain_key_name or ref.service_name)
-
-        labels = labels_repo.get_labels_for_item(self.conn, "api_refs", ref.id)  # type: ignore[arg-type]
-        label_chips = ft.Row(
-            [_label_chip(lb) for lb in labels], spacing=4
-        ) if labels else ft.Container()
+        labels = labels_repo.get_labels_for_item(
+            self.conn, "api_refs", ref.id  # type: ignore[arg-type]
+        )
 
         return ft.Container(
             content=ft.Column(
@@ -232,7 +220,7 @@ class ApiRefsView(BaseView):
                                 color=PALETTE["text.primary"],
                             ),
                             ft.Container(expand=True),
-                            _copy_btn(
+                            copy_button(
                                 ft.Icons.CONTENT_COPY,
                                 "Copy URL",
                                 lambda: copy_to_clipboard(
@@ -241,7 +229,7 @@ class ApiRefsView(BaseView):
                                     f'URL "{ref.service_name}" disalin!',
                                 ),
                             ),
-                            _copy_btn(
+                            copy_button(
                                 ft.Icons.KEY_OUTLINED,
                                 "Copy key",
                                 lambda: copy_to_clipboard(
@@ -250,17 +238,17 @@ class ApiRefsView(BaseView):
                                     f'API key "{ref.service_name}" disalin!',
                                 ),
                             ),
-                            _action_button(
+                            action_button(
                                 ft.Icons.COPY_ALL_OUTLINED,
                                 "Duplicate",
                                 lambda e, r=ref: self._duplicate(r),
                             ),
-                            _action_button(
+                            action_button(
                                 ft.Icons.EDIT_OUTLINED,
                                 "Edit",
                                 lambda e, r=ref: self._open_edit(r),
                             ),
-                            _action_button(
+                            action_button(
                                 ft.Icons.DELETE_OUTLINE,
                                 "Hapus",
                                 lambda e, r=ref: self._delete(r),
@@ -269,30 +257,22 @@ class ApiRefsView(BaseView):
                         ],
                         spacing=4,
                     ),
-                    label_chips,
+                    render_label_chips(labels),
                     ft.Text(
                         ref.base_url,
                         size=12,
                         color=PALETTE["accent.mint"],
                         style=ft.TextStyle(font_family="monospace"),
                     ),
-                    ft.Row(
-                        [
-                            ft.Container(
-                                content=ft.Text(
-                                    ref.auth_type or "Tanpa auth",
-                                    size=11,
-                                    color=PALETTE["text.secondary"],
-                                ),
-                                bgcolor=PALETTE["bg.surface-hover"],
-                                padding=ft.Padding.symmetric(
-                                    horizontal=6, vertical=2
-                                ),
-                                border_radius=6,
-                            ),
-                        ],
-                        spacing=4,
-                        alignment=ft.MainAxisAlignment.START,
+                    ft.Container(
+                        content=ft.Text(
+                            ref.auth_type or "Tanpa auth",
+                            size=11,
+                            color=PALETTE["text.secondary"],
+                        ),
+                        bgcolor=PALETTE["bg.surface-hover"],
+                        padding=ft.Padding.symmetric(horizontal=6, vertical=2),
+                        border_radius=6,
                     ),
                 ],
                 spacing=4,
@@ -301,33 +281,16 @@ class ApiRefsView(BaseView):
             border=ft.Border.all(1, PALETTE["border.subtle"]),
             border_radius=8,
             padding=12,
+            on_hover=lambda e: _hover_card(e),
         )
 
 
-def _label_chip(label: Any) -> ft.Container:
-    return ft.Container(
-        content=ft.Text(label.name, size=10, color=PALETTE["bg.base"]),
-        bgcolor=label.color,
-        padding=ft.Padding.symmetric(horizontal=6, vertical=1),
-        border_radius=4,
-    )
-
-
-def _copy_btn(icon: Any, tooltip: str, on_click: Any) -> ft.IconButton:
-    return ft.IconButton(
-        icon=icon,
-        icon_color=PALETTE["state.success"],
-        tooltip=tooltip,
-        on_click=on_click,
-    )
-
-
-def _action_button(
-    icon: Any, tooltip: str, on_click: Any, danger: bool = False
-) -> ft.IconButton:
-    return ft.IconButton(
-        icon=icon,
-        icon_color=PALETTE["state.danger"] if danger else PALETTE["text.secondary"],
-        tooltip=tooltip,
-        on_click=on_click,
-    )
+def _hover_card(e: ft.ControlEvent) -> None:
+    """Efek hover pada kartu."""
+    ctrl = e.control
+    if e.data == "true":
+        ctrl.bgcolor = PALETTE["bg.surface-hover"]  # type: ignore[attr-defined]
+        ctrl.update()
+    else:
+        ctrl.bgcolor = PALETTE["bg.surface"]  # type: ignore[attr-defined]
+        ctrl.update()

@@ -166,13 +166,47 @@ class Sidebar:
                             PALETTE["bg.base"] if active else PALETTE["text.secondary"]
                         )
 
-    def _footer(self) -> ft.Text:
-        """Footer kecil di bawah sidebar."""
-        return ft.Text(
-            "v1 — lokaldir",
-            size=11,
-            color=PALETTE["text.secondary"],
+    def _footer(self) -> ft.Row:
+        """Footer dengan tombol export/import."""
+        export_btn = ft.IconButton(
+            icon=ft.Icons.UPLOAD_FILE,
+            icon_color=PALETTE["text.secondary"],
+            icon_size=16,
+            tooltip="Export data",
+            on_click=lambda e: (
+                self._on_export() if hasattr(self, '_on_export') else None
+            ),
         )
+        import_btn = ft.IconButton(
+            icon=ft.Icons.DOWNLOAD,
+            icon_color=PALETTE["text.secondary"],
+            icon_size=16,
+            tooltip="Import data",
+            on_click=lambda e: (
+                self._on_import() if hasattr(self, '_on_import') else None
+            ),
+        )
+        return ft.Row(
+            [
+                ft.Text(
+                    "v1.5",
+                    size=11,
+                    color=PALETTE["text.secondary"],
+                ),
+                ft.Container(expand=True),
+                export_btn,
+                import_btn,
+            ],
+            spacing=4,
+            alignment=ft.MainAxisAlignment.END,
+        )
+
+    def set_export_import_handlers(
+        self, on_export: Any, on_import: Any
+    ) -> None:
+        """Set callback untuk export/import."""
+        self._on_export = on_export
+        self._on_import = on_import
 
     def build(self) -> ft.Container:
         """Kembalikan container sidebar.

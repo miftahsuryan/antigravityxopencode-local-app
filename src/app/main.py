@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 import flet as ft
 
@@ -13,6 +14,7 @@ from src.app.views.base import BaseView
 from src.app.views.commands_view import CommandsView
 from src.app.views.labels_view import LabelsView
 from src.app.views.prompts_view import PromptsView
+from src.core.io import export_to_json, import_from_json
 from src.core.search import SearchResult, search_all
 from src.core.storage.db import init_db
 
@@ -41,6 +43,10 @@ class DevCodexApp:
         self.page.padding = 0
 
         self.page.on_keyboard_event = self._on_keyboard
+
+        self.sidebar.set_export_import_handlers(
+            self._export_data, self._import_data
+        )
 
         self.page.add(
             ft.Row(
@@ -75,6 +81,87 @@ class DevCodexApp:
                 self.page.update()
         elif e.key == "F" and e.meta:
             pass  # Cmd+F: search field focus (handled by sidebar click)
+        elif e.key == "E" and e.meta:
+            self._export_data()
+
+    def _export_data(self) -> None:
+        """Export semua data ke JSON file."""
+        from pathlib import Path
+
+        desktop = Path.home() / "Desktop"
+        file_path = desktop / "devcodex_export.json"
+        try:
+            export_to_json(self.conn, file_path)
+            snack = ft.SnackBar(
+                ft.Text(f"Data diekspor ke {file_path}"),
+                bgcolor="#3DDC84",
+            )
+            self.page.overlay.append(snack)
+            snack.open = True
+            self.page.update()
+        except Exception as ex:
+            snack = ft.SnackBar(
+                ft.Text(f"Gagal export: {ex}"),
+                bgcolor="#F5484B",
+            )
+            self.page.overlay.append(snack)
+            snack.open = True
+            self.page.update()
+
+    def _import_data(self) -> None:
+        """Import data dari JSON file."""
+        from pathlib import Path
+
+        desktop = Path.home() / "Desktop"
+        file_path = desktop / "devcodex_export.json"
+        if not file_path.exists():
+            snack = ft.SnackBar(
+                ft.Text(f"File {file_path} tidak ditemukan."),
+                bgcolor="#F5484B",
+            )
+            self.page.overlay.append(snack)
+            snack.open = True
+            self.page.update()
+            return
+
+        def _confirm_import(e: Any) -> None:
+            try:
+                counts = import_from_json(self.conn, file_path, merge=True)
+                self.page.pop_dialog()
+                for key in self.views:
+                    self.views[key].refresh()
+                self._navigate(self.current_key)
+                total = sum(counts.values())
+                snack = ft.SnackBar(
+                    ft.Text(f"Import selesai: {total} item ditambahkan."),
+                    bgcolor="#3DDC84",
+                )
+                self.page.overlay.append(snack)
+                snack.open = True
+                self.page.update()
+            except Exception as ex:
+                self.page.pop_dialog()
+                snack = ft.SnackBar(
+                    ft.Text(f"Gagal import: {ex}"),
+                    bgcolor="#F5484B",
+                )
+                self.page.overlay.append(snack)
+                snack.open = True
+                self.page.update()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Import Data"),
+            content=ft.Text(
+                f"Import data dari {file_path}?\n"
+                "Data yang sudah ada akan di-skip (merge mode)."
+            ),
+            actions=[
+                ft.TextButton("Batal", on_click=lambda e: self.page.pop_dialog()),
+                ft.FilledButton("Import", on_click=_confirm_import),
+            ],
+        )
+        self.page.show_dialog(dialog)
 
     def _search(self, query: str) -> None:
         if not query or not query.strip():

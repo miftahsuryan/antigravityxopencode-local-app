@@ -86,11 +86,21 @@ class BaseView:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Icon(ft.Icons.INBOX, size=48, color=PALETTE["border.subtle"]),
+                    ft.Icon(
+                        ft.Icons.INVENTORY_2_OUTLINED,
+                        size=56,
+                        color=PALETTE["text.secondary"],
+                    ),
                     ft.Text(
                         message,
+                        size=16,
+                        color=PALETTE["text.primary"],
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    ft.Text(
+                        "Klik tombol + di atas untuk menambahkan",
+                        size=12,
                         color=PALETTE["text.secondary"],
-                        italic=True,
                         text_align=ft.TextAlign.CENTER,
                     ),
                 ],

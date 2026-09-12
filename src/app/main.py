@@ -68,7 +68,28 @@ class DevCodexApp:
         view = self.views[key]
         view.refresh()
         self.content_area.content = view.build()
+        self._update_badges()
         self.page.update()
+
+    def _update_badges(self) -> None:
+        """Update badge counters untuk semua modul."""
+        from src.core.storage import (
+            api_refs_repo,
+            commands_repo,
+            labels_repo,
+            prompts_repo,
+        )
+
+        self.sidebar.update_badge("labels", len(labels_repo.list_labels(self.conn)))
+        self.sidebar.update_badge(
+            "prompts", len(prompts_repo.list_prompts(self.conn))
+        )
+        self.sidebar.update_badge(
+            "commands", len(commands_repo.list_commands(self.conn))
+        )
+        self.sidebar.update_badge(
+            "api_refs", len(api_refs_repo.list_api_refs(self.conn))
+        )
 
     def _open_result(self, module: str, title: str) -> None:
         self._navigate(module)

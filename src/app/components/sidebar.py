@@ -42,8 +42,8 @@ class Sidebar:
         self.on_navigate = on_navigate
         self.on_search = on_search
         self.active_key: str = "labels"
-        # Simpan referensi tombol per modul untuk styling aktif.
         self._buttons: dict[str, ft.Container] = {}
+        self._badges: dict[str, ft.Container] = {}
         self._build()
 
     def _build(self) -> None:
@@ -116,21 +116,22 @@ class Sidebar:
         )
 
     def _nav_button(self, key: str, label: str, icon: Any) -> ft.Container:
-        """Buat tombol navigasi satu modul.
-
-        Args:
-            key: key unik modul (untuk callback).
-            label: label yang ditampilkan.
-            icon: ikon Flet.
-
-        Returns:
-            Container berisi tombol navigasi.
-        """
+        """Buat tombol navigasi satu modul dengan badge counter."""
+        badge = ft.Container(
+            content=ft.Text("", size=10, color=PALETTE["text.secondary"]),
+            bgcolor=PALETTE["bg.surface-hover"],
+            padding=ft.Padding.symmetric(horizontal=6, vertical=1),
+            border_radius=8,
+            visible=False,
+        )
+        self._badges[key] = badge
         return ft.Container(
             content=ft.Row(
                 [
                     ft.Icon(icon, size=18, color=PALETTE["text.secondary"]),
                     ft.Text(label, size=14, color=PALETTE["text.secondary"]),
+                    ft.Container(expand=True),
+                    badge,
                 ],
                 spacing=8,
             ),
@@ -139,6 +140,19 @@ class Sidebar:
             on_click=lambda _, k=key: self._select(k),
             ink=True,
         )
+
+    def update_badge(self, key: str, count: int) -> None:
+        """Update badge counter untuk modul tertentu."""
+        if key in self._badges:
+            badge = self._badges[key]
+            if count > 0:
+                badge.content = ft.Text(
+                    str(count), size=10, color=PALETTE["text.secondary"]
+                )
+                badge.visible = True
+            else:
+                badge.visible = False
+            self.page.update()
 
     def _select(self, key: str) -> None:
         """Pilih modul dan panggil callback navigasi.

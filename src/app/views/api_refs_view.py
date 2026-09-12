@@ -228,6 +228,7 @@ class ApiRefsView(BaseView):
                                     ref.base_url or ref.service_name,
                                     f'URL "{ref.service_name}" disalin!',
                                 ),
+                                accent=False,
                             ),
                             copy_button(
                                 ft.Icons.KEY_OUTLINED,
@@ -237,6 +238,7 @@ class ApiRefsView(BaseView):
                                     secret_value or ref.service_name,
                                     f'API key "{ref.service_name}" disalin!',
                                 ),
+                                accent=True,
                             ),
                             action_button(
                                 ft.Icons.COPY_ALL_OUTLINED,

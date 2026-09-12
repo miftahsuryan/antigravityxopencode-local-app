@@ -32,11 +32,15 @@ def action_button(
     )
 
 
-def copy_button(icon: Any, tooltip: str, on_click: Any) -> ft.IconButton:
-    """Tombol copy dengan warna hijau."""
+def copy_button(
+    icon: Any, tooltip: str, on_click: Any, accent: bool = False
+) -> ft.IconButton:
+    """Tombol copy. accent=True untuk warna hijau (API key)."""
     return ft.IconButton(
         icon=icon,
-        icon_color=PALETTE["state.success"],
+        icon_color=(
+            PALETTE["state.success"] if accent else PALETTE["text.secondary"]
+        ),
         tooltip=tooltip,
         on_click=on_click,
     )

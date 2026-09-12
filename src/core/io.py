@@ -71,7 +71,6 @@ def export_label_to_json(
                 "base_url": r.base_url,
                 "description": r.description,
                 "auth_type": r.auth_type,
-                "keychain_key_name": r.keychain_key_name,
             })
 
     data = {
@@ -171,7 +170,6 @@ def import_label_from_json(
                 base_url=item.get("base_url", ""),
                 description=item.get("description", ""),
                 auth_type=item.get("auth_type", ""),
-                keychain_key_name=item.get("keychain_key_name", ""),
             ),
         )
         if r.id is not None:

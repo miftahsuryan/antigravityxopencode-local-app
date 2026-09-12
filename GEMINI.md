@@ -1,82 +1,81 @@
 # GEMINI.md — Konfigurasi & Instruksi Utama Agent
 
-> File ini dibaca otomatis oleh agent Antigravity di awal setiap sesi. Ini adalah "kontrak" utama antara Anda dan agent: apa yang dibangun, dengan cara apa, dan aturan dasar apa yang tidak boleh dilanggar.
-> Detail per-topik ada di `.agents/rules/*.md` — jangan duplikasi isinya di sini, cukup rujuk.
+> File ini dibaca otomatis oleh agent di awal setiap sesi. Ini adalah "kontrak" utama antara Anda dan agent.
 
 ## 1. Identitas Proyek
 
-- **Nama kerja produk:** DevCodex *(placeholder — ganti sesuai selera Anda, cukup update file ini + `docs/brand_guidelines.md`)*
-- **Tujuan:** Aplikasi desktop lokal (macOS, Apple Silicon) untuk menyimpan & merekap dalam satu tempat:
-  1. Catatan/dokumentasi berbasis Markdown (`.md`)
-  2. Prompt AI yang sering dipakai (Claude, Gemini, GPT, dll.)
-  3. Command / snippet terminal
-  4. Referensi API (endpoint, deskripsi, cara auth — **bukan** gudang password)
-- **Target pengguna:** Hanya untuk penggunaan pribadi (single-user), berjalan 100% lokal, tanpa akun/cloud wajib.
-- **Platform:** macOS 13+ (Apple Silicon M1 Pro), dikemas sebagai aplikasi native `.app`.
+- **Nama produk:** DevCodex
+- **Tujuan:** Aplikasi desktop lokal (macOS) untuk menyimpan & mengelola:
+  1. Prompt AI (Claude, Gemini, GPT, dll.)
+  2. Command / snippet terminal
+  3. Referensi API (endpoint, auth, API key di Keychain)
+- **Target pengguna:** Single-user, 100% lokal, tanpa cloud
+- **Platform:** macOS 13+ (Apple Silicon), `.app` native
 
-## 2. Keputusan Arsitektur (Tech Stack)
+## 2. Tech Stack
 
-| Layer | Pilihan | Alasan |
-|---|---|---|
-| Bahasa | Python 3.12+ | Selaras dengan basis skill yang sudah dikuasai (PEP 8) |
-| UI Framework | [Flet](https://flet.dev) (berbasis Flutter) | Satu bahasa (Python) untuk UI + logic, bisa di-build jadi `.app` native M1 lewat `flet build macos`, tidak perlu belajar JS/Swift |
-| Penyimpanan terstruktur | SQLite (`~/Library/Application Support/DevCodex/devcodex.db`) | File tunggal, tanpa server, gampang di-backup |
-| Penyimpanan catatan | File `.md` asli di `data/vault/notes/**/*.md` | Catatan tetap portable, bisa dibuka editor lain / di-track Git terpisah kalau mau |
-| Secret/API key | macOS Keychain via package `keyring` | Lihat `.agents/rules/security-and-data.md` — **jangan pernah** simpan secret mentah di SQLite/JSON |
-| Testing | `pytest` + `mypy` + `ruff` + `black` | Lihat `.agents/rules/testing-and-qa.md` untuk command persis |
-
-Alternatif yang dipertimbangkan tapi ditolak untuk v1: Electron/Tauri + React — ditolak karena menambah bahasa (JS/TS atau Rust) yang tidak selaras dengan basis Python yang sudah dikuasai, dan menambah kompleksitas build untuk kebutuhan yang sebenarnya adalah tool personal, bukan produk komersial.
+| Layer | Pilihan |
+|---|---|
+| UI | [Flet](https://flet.dev) (Flutter-based) |
+| Bahasa | Python 3.12+ |
+| Database | SQLite (WAL mode, `~/Library/Application Support/DevCodex/devcodex.db`) |
+| Secret | macOS Keychain via `keyring` |
+| Markdown | `markdown` library |
+| Testing | pytest + mypy + ruff |
 
 ## 3. Struktur Folder
 
 ```
 devcodex/
-├── GEMINI.md              # instruksi agent (auto-discovery)
-├── .agents/rules/         # aturan tim & QA
-├── .agent/skills/         # custom skills
-├── pyproject.toml         # konfigurasi Python project
+├── GEMINI.md              # file ini
+├── pyproject.toml         # ruff, mypy, pytest config
 ├── requirements.txt       # dependencies
-│
-├── docs/                  # dokumentasi & brand guidelines
+├── docs/                  # dokumentasi & user guides
 │   ├── README.md
 │   ├── brand_guidelines.md
-│   └── paper-trail/       # rencana implementasi per fitur
-│
-├── src/                   # kode sumber aplikasi
-│   ├── app/               # layer UI (Flet views, components, theme)
-│   └── core/              # layer logic (models, storage, search, security)
-│
-├── tests/                 # unit test, struktur mirror src/
-├── assets/                # aset visual (icon, dll.)
-└── data/                  # sample/vault lokal utk dev — DB asli di App Support (di-gitignore)
+│   ├── prompt-guide.md
+│   ├── command-guide.md
+│   └── api-reference-guide.md
+├── src/
+│   ├── app/               # UI layer (Flet)
+│   └── core/              # business logic (models, storage, search, io)
+├── tests/                 # 47 tests
+└── assets/                # icon
 ```
 
-## 4. Fitur Inti (v1.5 — Label System Selesai)
+## 4. Fitur Inti (v1.8)
 
-1. **Labels** — CRUD label dengan warna, filtered view per label, item counts.
-2. **Prompt Library** — simpan prompt AI, kategori per tool/model, label, favorit/pin, quick-copy, duplicate.
-3. **Command Snippets** — simpan command terminal + deskripsi + label, quick-copy, duplicate.
-4. **API References** — simpan nama service, base URL, deskripsi, tipe auth, label. Secret disimpan di **macOS Keychain**, dapat di-reveal dan disalin langsung dari kartu. Dual copy: URL + key.
-5. **Cross-cutting:** global search (lintas 4 modul sekaligus), sidebar navigasi 4 section + search bar di atas, dark mode sebagai default, sorting (newest/oldest/name), keyboard shortcuts (Cmd+N, Cmd+F), hover effects pada kartu.
+1. **Labels** — CRUD label dengan warna, segmented view, item counts
+2. **Prompts** — CRUD + copy + favorit + markdown preview + duplicate
+3. **Commands** — CRUD + copy monospace + duplicate
+4. **API References** — CRUD + copy URL/key + Keychain secret + duplicate
+5. **Import/Export** — per-label JSON export/import
+6. **Search** — global search lintas modul
+7. **Sorting** — newest, oldest, name A-Z, name Z-A
+8. **Keyboard Shortcuts** — Cmd+N (new), Cmd+F (search), Cmd+E (export)
+9. **Hover Effects** — visual feedback pada kartu
+10. **Badge Counters** — jumlah item di sidebar
 
-Fitur yang **sengaja ditunda** ke v2+: import/export JSON, markdown preview, template variables, bulk actions, API playground, command runner, sync cloud, multi-user.
+Fitur yang **ditunda** ke v2+: command runner, AI model integration, prompt templates, version history, bulk actions, workflow builder.
 
-## 5. Aturan Wajib (Rules)
+## 5. Aturan Wajib
 
-Sebelum menulis kode apa pun, baca dan patuhi:
-- `.agents/rules/coding-standards.md` — gaya kode, struktur modul, naming.
-- `.agents/rules/testing-and-qa.md` — command wajib dijalankan tiap perubahan (self-correction loop).
-- `.agents/rules/security-and-data.md` — aturan penyimpanan data & secret.
-- `.agents/rules/git-workflow.md` — branch, commit message, dan kewajiban paper trail sebelum coding fitur baru.
+- Ruff, mypy, dan pytest harus lulus sebelum commit
+- Secret tidak boleh di-export atau disimpan di SQLite
+- Gunakan `PALETTE` dari `theme.py`, jangan hardcode warna
+- Ikuti PEP 8 dan coding standards yang ada
+- Buat paper trail sebelum implementasi fitur baru
 
-## 6. Custom Skills
+## 6. Testing
 
-- `.agent/skills/tdd-workflow/` — alur test-driven development yang dipakai untuk logic di `core/`.
-- `.agent/skills/security-review/` — checklist review sebelum kode yang menyentuh secret/API di-merge.
+```bash
+pytest tests/ -v          # run all tests
+ruff check src/           # lint
+mypy src/                 # type check
+```
 
-## 7. Alur Kerja Agent (ringkas)
+## 7. Build
 
-1. Untuk fitur baru yang tidak trivial: buat dulu paper trail di `docs/paper-trail/` (lihat template), baru mulai coding.
-2. Tulis & jalankan test sesuai `testing-and-qa.md` di setiap langkah.
-3. Ikuti palet warna, tipografi, dan tone di `docs/brand_guidelines.md` untuk semua elemen UI.
-4. Jangan pernah menambahkan dependency baru tanpa mencatat alasannya singkat di commit message.
+```bash
+flet build macos          # build .app bundle
+```

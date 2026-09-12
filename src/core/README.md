@@ -1,36 +1,54 @@
 # `core/` — Business Logic Layer
 
-Semua logic domain: models, storage (repository pattern di atas SQLite), search, dan security helper (wrapper `keyring`). Folder ini **tidak boleh** import apa pun dari `app/`.
+Semua logic domain: models, storage (repository pattern di atas SQLite), search, security helper (wrapper `keyring`), dan I/O (import/export JSON). Folder ini **tidak boleh** import apa pun dari `app/`.
 
-## Struktur yang disarankan
+## Struktur
 
 ```
 core/
-├── models.py           # dataclass: Note (dengan content), Prompt, Command, ApiRef
+├── models.py              # dataclass: Label, Prompt, Command, ApiRef
 ├── storage/
-│   ├── db.py             # koneksi SQLite + migrasi skema (V1 + V2)
-│   ├── notes_repo.py
-│   ├── prompts_repo.py
-│   ├── commands_repo.py
-│   └── api_refs_repo.py
-├── search.py             # full-text search lintas 4 modul (termasuk content)
-├── secrets.py             # wrapper tipis di atas `keyring`
+│   ├── db.py              # koneksi SQLite + migrasi skema V1
+│   ├── labels_repo.py     # CRUD labels + junction table helpers
+│   ├── prompts_repo.py    # CRUD prompts
+│   ├── commands_repo.py   # CRUD commands
+│   └── api_refs_repo.py   # CRUD API references
+├── search.py              # global search lintas 4 modul
+├── io.py                  # export/import JSON per label
+├── secrets.py             # wrapper keyring untuk macOS Keychain
 └── README.md
 ```
 
-## Migrasi Skema
+## Data Models
 
-Skema menggunakan `PRAGMA user_version`. Saat ini V2 (menambahkan kolom `content` ke tabel `notes`).
+| Model | Fields | Notes |
+|---|---|---|
+| `Label` | id, name (unique), color, description | Warna picker: 8 preset colors |
+| `Prompt` | id, title, content, tool, is_favorite, label_ids | label_ids dari junction table |
+| `Command` | id, title, command_text, description, label_ids | label_ids dari junction table |
+| `ApiRef` | id, service_name, base_url, description, auth_type, keychain_key_name, label_ids | Secret disimpan di Keychain |
 
-## Menjalankan Test Khusus Layer Ini
+## Database Schema
+
+- **Tabel:** `labels`, `prompts`, `commands`, `api_refs`, `label_items`
+- **Junction table:** `label_items` untuk many-to-many Label ↔ items
+- **Migrasi:** `PRAGMA user_version`, saat ini V1
+
+## Import/Export (`io.py`)
+
+- `export_label_to_json(conn, file_path, label_id)` — export items satu label ke JSON
+- `import_label_from_json(conn, file_path)` — import dari JSON, reuse label jika sudah ada
+- API key (keychain_key_name) TIDAK di-export untuk keamanan
+
+## Menjalankan Test
 
 ```bash
 pytest tests/core -q
-mypy core/
+mypy src/core/
 ```
 
-## Aturan Tambahan
+## Aturan
 
-- Setiap repository (`*_repo.py`) hanya boleh tahu tentang tabelnya sendiri — join lintas tabel (kalau perlu) ditaruh di `search.py`, bukan di repo individual.
-- Migrasi skema: tambah versi baru di `storage/db.py`, jangan ubah skema tabel lama secara destruktif tanpa mencatatnya di paper trail terkait.
-- Nilai secret **tidak boleh** disimpan di SQLite — gunakan `secrets.py` (wrapper `keyring`).
+- Repository hanya boleh tahu tabel sendiri — join di `search.py`
+- Nilai secret **tidak boleh** di SQLite — gunakan `secrets.py`
+- Tambah migrasi baru di `db.py`, jangan ubah skema lama tanpa paper trail

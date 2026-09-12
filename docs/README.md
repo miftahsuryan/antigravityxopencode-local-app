@@ -2,90 +2,117 @@
 
 Vault personal untuk menyimpan dan mengelola prompt AI, command terminal, dan referensi API dalam satu aplikasi desktop lokal (macOS).
 
-> Status: v1.5 — Label system selesai, core features berfungsi penuh.
+> **Status:** v1.8 — Markdown preview, import/export per label, hover effects, badge counters.
 
 ## Tech Stack
 
-- Python 3.12+
-- [Flet](https://flet.dev) (UI, berbasis Flutter) — dikemas ke `.app` native lewat `flet build macos`
-- SQLite untuk data terstruktur
-- `keyring` untuk penyimpanan secret di macOS Keychain
-- `pytest` + `mypy` + `ruff` untuk testing & code quality
+| Layer | Teknologi |
+|---|---|
+| UI | [Flet](https://flet.dev) (Flutter-based) |
+| Backend | Python 3.12+ |
+| Database | SQLite (WAL mode) |
+| Secret | macOS Keychain via `keyring` |
+| Markdown | `markdown` library |
+| Testing | pytest + mypy + ruff |
 
-## Setup Development
+## Quick Start
 
 ```bash
-# Buat virtual environment
+# Setup
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Jalankan versi development
+# Run
 python -m src.app.main
-```
 
-## Build Aplikasi Native (macOS)
-
-```bash
-# Pastikan flet terinstall
-pip install flet
-
-# Build macOS .app bundle
+# Build macOS app
 flet build macos
 ```
-
-Output `.app` akan ada di folder `build/macos/`.
 
 ## Struktur Proyek
 
 ```
 devcodex/
 ├── GEMINI.md              # instruksi agent
-├── pyproject.toml         # konfigurasi Python project
+├── pyproject.toml         # ruff, mypy, pytest config
 ├── requirements.txt       # dependencies
 │
-├── docs/                  # dokumentasi & user guides
-│   ├── README.md
+├── docs/                  # dokumentasi
+│   ├── README.md          # file ini
 │   ├── brand_guidelines.md
 │   ├── prompt-guide.md    # best practices menulis prompt
 │   ├── command-guide.md   # reference command umum
-│   └── api-reference-guide.md
+│   ├── api-reference-guide.md
+│   └── paper-trail/       # rencana implementasi
 │
-├── src/                   # kode sumber aplikasi
-│   ├── app/               # layer UI (Flet views, components, theme)
+├── src/
+│   ├── app/               # UI layer (Flet)
 │   │   ├── main.py        # entry point, routing
-│   │   ├── theme.py       # token warna/tipografi
-│   │   ├── components/    # sidebar, shared cards
-│   │   ├── views/         # 4 view modul (labels, prompts, commands, api_refs)
-│   │   └── utils/         # clipboard helper
-│   └── core/              # layer logic (models, storage, search, security)
+│   │   ├── theme.py       # color palette
+│   │   ├── components/    # sidebar, cards, markdown_view
+│   │   ├── views/         # 4 module views
+│   │   └── utils/         # clipboard
+│   └── core/              # business logic
+│       ├── models.py      # Label, Prompt, Command, ApiRef
+│       ├── storage/       # SQLite repos
+│       ├── search.py      # global search
+│       ├── io.py          # import/export JSON
+│       └── secrets.py     # Keychain wrapper
 │
-├── tests/                 # unit test
-└── assets/                # aset visual (icon)
+├── tests/                 # 47 tests
+└── assets/                # icon
 ```
 
 ## Fitur Utama
 
+### Modul Inti
+
 | Modul | Fitur |
 |---|---|
-| **Labels** | CRUD label dengan warna, segmented view items per label |
-| **Prompts** | CRUD prompt AI, copy, favorit, label assignment, duplicate |
-| **Commands** | CRUD command terminal, copy, label assignment, duplicate |
-| **API References** | CRUD API refs, copy URL/key dari Keychain, label assignment, duplicate |
+| **Labels** | CRUD + warna + segmented view + item counts |
+| **Prompts** | CRUD + copy + favorit + markdown preview + duplicate |
+| **Commands** | CRUD + copy monospace + duplicate |
+| **API References** | CRUD + copy URL/key + Keychain secret + duplicate |
 
-## Fitur Tambahan
+### Fitur Tambahan
 
-- **Global Search** — cari lintas semua modul
-- **Sorting** — urutkan berdasarkan waktu atau nama
-- **Duplicate** — clone item dengan satu klik
-- **Keyboard Shortcuts** — Cmd+N (new), Cmd+F (search)
-- **Hover Effects** — visual feedback saat mouse hover
+| Fitur | Deskripsi |
+|---|---|
+| **Global Search** | Cari lintas semua modul |
+| **Sorting** | Newest, oldest, name A-Z, name Z-A |
+| **Import/Export** | Per-label JSON export/import |
+| **Keyboard Shortcuts** | Cmd+N (new), Cmd+F (search), Cmd+E (export) |
+| **Hover Effects** | Visual feedback pada kartu |
+| **Badge Counters** | Jumlah item di sidebar |
+| **Markdown Preview** | Toggle preview pada prompt cards |
 
-## Dokumentasi
+## Keyboard Shortcuts
 
-- [`prompt-guide.md`](./prompt-guide.md) — best practices menulis prompt AI
-- [`command-guide.md`](./command-guide.md) — reference command terminal umum
-- [`api-reference-guide.md`](./api-reference-guide.md) — panduan API key management
-- [`brand_guidelines.md`](./brand_guidelines.md) — identitas visual & design system
+| Shortcut | Action |
+|---|---|
+| `Cmd + N` | Tambah item baru |
+| `Cmd + F` | Focus search |
+| `Cmd + E` | Export data |
+
+## User Guides
+
+| Dokumen | Deskripsi |
+|---|---|
+| [`prompt-guide.md`](./prompt-guide.md) | Best practices menulis prompt AI |
+| [`command-guide.md`](./command-guide.md) | Reference command terminal |
+| [`api-reference-guide.md`](./api-reference-guide.md) | API key management |
+| [`brand_guidelines.md`](./brand_guidelines.md) | Design system & colors |
+
+## Development
+
+```bash
+# Run tests
+pytest tests/ -v
+
+# Type check
+mypy src/
+
+# Lint
+ruff check src/
+```

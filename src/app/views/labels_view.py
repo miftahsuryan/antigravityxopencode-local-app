@@ -311,6 +311,7 @@ class LabelsView(BaseView):
                                     self.page, p.content,
                                     f'Prompt "{p.title}" disalin.',
                                 ),
+                                accent=False,
                             ),
                             ft.Text(
                                 p.title,

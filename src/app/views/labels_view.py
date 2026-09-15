@@ -15,9 +15,15 @@ from src.app.components.cards import action_button, copy_button, label_chip
 from src.app.theme import PALETTE
 from src.app.utils.clipboard import copy_to_clipboard
 from src.app.views.base import BaseView
-from src.core.models import ApiRef, Command, Label, Prompt
+from src.core.models import ApiRef, Command, DocFile, Label, Prompt
 from src.core.secrets import get_secret
-from src.core.storage import api_refs_repo, commands_repo, labels_repo, prompts_repo
+from src.core.storage import (
+    api_refs_repo,
+    commands_repo,
+    doc_files_repo,
+    labels_repo,
+    prompts_repo,
+)
 
 # Daftar warna yang tersedia untuk label.
 LABEL_COLORS: list[str] = [
@@ -38,6 +44,7 @@ class LabelsView(BaseView):
     def __init__(self, page: ft.Page, conn: sqlite3.Connection) -> None:
         super().__init__(page, "Labels", ft.Icons.LABEL_OUTLINED, self._open_add)
         self.conn = conn
+        self.expanded_labels: set[int] = set()
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -195,6 +202,7 @@ class LabelsView(BaseView):
         all_commands: list[Command],
         all_api_refs: list[ApiRef],
     ) -> ft.Container:
+        is_expanded = label.id in self.expanded_labels
         total = sum(item_counts.values())
 
         label_prompt_ids = set(
@@ -206,10 +214,20 @@ class LabelsView(BaseView):
         label_api_ids = set(
             labels_repo.get_items_by_label(self.conn, label.id, "api_refs")  # type: ignore[arg-type]
         )
+        label_folder_ids = set(
+            labels_repo.get_items_by_label(self.conn, label.id, "doc_folders")  # type: ignore[arg-type]
+        )
 
         filtered_prompts = [p for p in all_prompts if p.id in label_prompt_ids]
         filtered_commands = [c for c in all_commands if c.id in label_cmd_ids]
         filtered_api_refs = [r for r in all_api_refs if r.id in label_api_ids]
+
+        doc_files: list[DocFile] = []
+        for fid in label_folder_ids:
+            files_in_folder = doc_files_repo.list_files_by_folder(
+                self.conn, fid
+            )
+            doc_files.extend(files_in_folder)
 
         content_controls: list[ft.Control] = []
 
@@ -237,12 +255,20 @@ class LabelsView(BaseView):
             for r in filtered_api_refs:
                 content_controls.append(self._api_item(r))
 
+        if doc_files:
+            content_controls.append(
+                ft.Text("Docs", size=13, weight=ft.FontWeight.W_600,
+                        color=PALETTE["accent.mint"])
+            )
+            for df in doc_files:
+                content_controls.append(self._doc_file_item(df))
+
         if not content_controls:
             content_controls.append(
                 ft.Text("(Belum ada item)", size=12, color=PALETTE["text.secondary"])
             )
 
-        header = ft.Row(
+        header_row = ft.Row(
             [
                 ft.Container(
                     width=12,
@@ -262,6 +288,15 @@ class LabelsView(BaseView):
                     color=PALETTE["text.secondary"],
                 ),
                 ft.Container(expand=True),
+                ft.Icon(
+                    (
+                        ft.Icons.EXPAND_MORE
+                        if is_expanded
+                        else ft.Icons.CHEVRON_RIGHT_ROUNDED
+                    ),
+                    size=20,
+                    color=PALETTE["text.secondary"],
+                ),
                 action_button(
                     ft.Icons.EDIT_OUTLINED,
                     "Edit",
@@ -278,12 +313,20 @@ class LabelsView(BaseView):
             alignment=ft.MainAxisAlignment.START,
         )
 
+        header = ft.Container(
+            content=header_row,
+            on_click=lambda e: self._toggle_expand(label.id),
+        )
+
         return ft.Container(
             content=ft.Column(
                 [
                     header,
                     ft.Divider(height=1, color=PALETTE["border.subtle"]),
-                    ft.Column(content_controls, spacing=4),
+                    ft.Container(
+                        content=ft.Column(content_controls, spacing=4),
+                        visible=is_expanded,
+                    ),
                 ],
                 spacing=4,
             ),
@@ -292,6 +335,15 @@ class LabelsView(BaseView):
             border_radius=8,
             padding=12,
         )
+
+    def _toggle_expand(self, label_id: int | None) -> None:
+        if label_id is None:
+            return
+        if label_id in self.expanded_labels:
+            self.expanded_labels.remove(label_id)
+        else:
+            self.expanded_labels.add(label_id)
+        self.refresh()
 
     def _prompt_item(self, p: Prompt) -> ft.Container:
         labels = labels_repo.get_labels_for_item(self.conn, "prompts", p.id)  # type: ignore[arg-type]
@@ -307,7 +359,7 @@ class LabelsView(BaseView):
                             copy_button(
                                 ft.Icons.CONTENT_COPY,
                                 "Copy",
-                                lambda: copy_to_clipboard(
+                                lambda e: copy_to_clipboard(
                                     self.page, p.content,
                                     f'Prompt "{p.title}" disalin.',
                                 ),
@@ -443,4 +495,41 @@ class LabelsView(BaseView):
         copy_to_clipboard(
             self.page, target,
             f'API key "{ref.service_name}" disalin!',
+        )
+
+    def _doc_file_item(self, df: DocFile) -> ft.Container:
+        preview = (df.content or "")[:80]
+        if len(df.content or "") > 80:
+            preview += "..."
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Icon(
+                                ft.Icons.DESCRIPTION_OUTLINED,
+                                size=14,
+                                color=PALETTE["accent.mint"],
+                            ),
+                            ft.Text(
+                                df.title,
+                                size=14,
+                                weight=ft.FontWeight.W_600,
+                                color=PALETTE["text.primary"],
+                            ),
+                        ],
+                        spacing=4,
+                    ),
+                    ft.Text(
+                        preview,
+                        size=12,
+                        color=PALETTE["text.secondary"],
+                        max_lines=2,
+                    ),
+                ],
+                spacing=2,
+            ),
+            bgcolor=PALETTE["bg.surface-hover"],
+            border_radius=6,
+            padding=8,
         )

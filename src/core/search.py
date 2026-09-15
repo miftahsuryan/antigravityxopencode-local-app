@@ -94,4 +94,21 @@ def search_all(
             )
         )
 
+    # Doc Files
+    rows = conn.execute(
+        """SELECT id, title, content FROM doc_files
+           WHERE title LIKE ? OR content LIKE ?
+           ORDER BY updated_at DESC LIMIT ?""",
+        (pattern, pattern, limit),
+    ).fetchall()
+    for r in rows:
+        results.append(
+            SearchResult(
+                module="doc_files",
+                item_id=r["id"],
+                title=r["title"],
+                snippet=(r["content"] or "")[:80],
+            )
+        )
+
     return results

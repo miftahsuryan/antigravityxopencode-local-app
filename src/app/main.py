@@ -12,6 +12,7 @@ from src.app.theme import PALETTE
 from src.app.views.api_refs_view import ApiRefsView
 from src.app.views.base import BaseView
 from src.app.views.commands_view import CommandsView
+from src.app.views.docs_view import DocsView
 from src.app.views.labels_view import LabelsView
 from src.app.views.prompts_view import PromptsView
 from src.core.io import export_label_to_json, import_label_from_json
@@ -32,6 +33,7 @@ class DevCodexApp:
             "prompts": PromptsView(page, self.conn),
             "commands": CommandsView(page, self.conn),
             "api_refs": ApiRefsView(page, self.conn),
+            "docs": DocsView(page, self.conn),
         }
         self.content_area = ft.Container(expand=True)
 
@@ -77,6 +79,7 @@ class DevCodexApp:
         from src.core.storage import (
             api_refs_repo,
             commands_repo,
+            doc_files_repo,
             labels_repo,
             prompts_repo,
         )
@@ -90,6 +93,9 @@ class DevCodexApp:
         )
         self.sidebar.update_badge(
             "api_refs", len(api_refs_repo.list_api_refs(self.conn))
+        )
+        self.sidebar.update_badge(
+            "docs", doc_files_repo.count_all_files(self.conn)
         )
 
     def _open_result(self, module: str, title: str) -> None:
@@ -299,6 +305,7 @@ class DevCodexApp:
             "prompts": "Prompts",
             "commands": "Commands",
             "api_refs": "API",
+            "doc_files": "Docs",
         }.get(r.module, r.module)
         return ft.Container(
             content=ft.Row(

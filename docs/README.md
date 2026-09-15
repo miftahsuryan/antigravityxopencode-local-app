@@ -2,7 +2,7 @@
 
 Vault personal untuk menyimpan dan mengelola prompt AI, command terminal, dan referensi API dalam satu aplikasi desktop lokal (macOS).
 
-> **Status:** v1.8 — Markdown preview, import/export per label, hover effects, badge counters.
+> **Status:** v2.0 — Docs module (folder system + split-pane markdown editor), markdown preview, import/export per label, hover effects, badge counters.
 
 ## Tech Stack
 
@@ -51,16 +51,16 @@ devcodex/
 │   │   ├── main.py        # entry point, routing
 │   │   ├── theme.py       # color palette
 │   │   ├── components/    # sidebar, cards, markdown_view
-│   │   ├── views/         # 4 module views
+│   │   ├── views/         # 5 module views
 │   │   └── utils/         # clipboard
 │   └── core/              # business logic
-│       ├── models.py      # Label, Prompt, Command, ApiRef
+│       ├── models.py      # Label, Prompt, Command, ApiRef, DocFolder, DocFile
 │       ├── storage/       # SQLite repos
 │       ├── search.py      # global search
 │       ├── io.py          # import/export JSON
 │       └── secrets.py     # Keychain wrapper
 │
-├── tests/                 # 47 tests
+├── tests/                 # 68 tests
 └── assets/                # icon
 ```
 
@@ -74,6 +74,7 @@ devcodex/
 | **Prompts** | CRUD + copy + favorit + markdown preview + duplicate |
 | **Commands** | CRUD + copy monospace + duplicate |
 | **API References** | CRUD + copy URL/key + Keychain secret + duplicate |
+| **Docs** | Folder tree + file manager + split-pane markdown editor + labels on folders |
 
 ### Fitur Tambahan
 

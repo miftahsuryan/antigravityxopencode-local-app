@@ -7,9 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from src.core.models import ApiRef, Command, Label, Prompt
+from src.core.models import ApiRef, Command, DocFile, Label, Prompt
 from src.core.search import search_all
-from src.core.storage import api_refs_repo, commands_repo, labels_repo, prompts_repo
+from src.core.storage import (
+    api_refs_repo,
+    commands_repo,
+    doc_files_repo,
+    labels_repo,
+    prompts_repo,
+)
 from src.core.storage.db import init_db
 
 
@@ -57,6 +63,15 @@ def _seed_data(conn: sqlite3.Connection) -> None:
         ),
     )
 
+    doc_files_repo.create_file(
+        conn,
+        DocFile(
+            id=None,
+            title="setup-guide.md",
+            content="How to set up the project",
+        ),
+    )
+
 
 def test_search_finds_prompts(conn: sqlite3.Connection) -> None:
     _seed_data(conn)
@@ -77,6 +92,13 @@ def test_search_finds_api_refs(conn: sqlite3.Connection) -> None:
     results = search_all(conn, "OpenAI")
     assert len(results) >= 1
     assert any(r.module == "api_refs" for r in results)
+
+
+def test_search_finds_doc_files(conn: sqlite3.Connection) -> None:
+    _seed_data(conn)
+    results = search_all(conn, "setup-guide")
+    assert len(results) >= 1
+    assert any(r.module == "doc_files" for r in results)
 
 
 def test_search_finds_labels(conn: sqlite3.Connection) -> None:

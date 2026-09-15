@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.core.models import ApiRef, Command, Label, Prompt
+from src.core.models import ApiRef, Command, DocFile, DocFolder, Label, Prompt
 
 
 def test_label_defaults() -> None:
@@ -37,3 +37,19 @@ def test_prompt_label_ids_mutable() -> None:
     prompt = Prompt(id=1, title="Test", content="Hello")
     prompt.label_ids = [1, 2, 3]
     assert prompt.label_ids == [1, 2, 3]
+
+
+def test_doc_folder_defaults() -> None:
+    folder = DocFolder(id=1, name="Guides")
+    assert folder.parent_id is None
+    assert folder.color == "#6C8CFF"
+    assert folder.label_ids == []
+    assert folder.created_at is None
+
+
+def test_doc_file_defaults() -> None:
+    doc_file = DocFile(id=1, title="readme.md")
+    assert doc_file.content == ""
+    assert doc_file.folder_id is None
+    assert doc_file.file_type == "md"
+    assert doc_file.created_at is None

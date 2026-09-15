@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 _APP_SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "DevCodex"
 
@@ -76,12 +76,41 @@ CREATE TABLE IF NOT EXISTS label_items (
 """
 
 
+_MIGRATION_V2 = """\
+CREATE TABLE IF NOT EXISTS doc_folders (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    parent_id   INTEGER DEFAULT NULL,
+    color       TEXT    NOT NULL DEFAULT '#6C8CFF',
+    created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    FOREIGN KEY (parent_id) REFERENCES doc_folders(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS doc_files (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,
+    content     TEXT    NOT NULL DEFAULT '',
+    folder_id   INTEGER DEFAULT NULL,
+    file_type   TEXT    NOT NULL DEFAULT 'md',
+    created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+    FOREIGN KEY (folder_id) REFERENCES doc_folders(id) ON DELETE CASCADE
+);
+"""
+
+
 def run_migrations(conn: sqlite3.Connection) -> None:
     (current_version,) = conn.execute("PRAGMA user_version").fetchone()
 
-    if current_version < _SCHEMA_VERSION:
+    if current_version < 1:
         conn.executescript(_MIGRATION_V1)
-        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+        conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+
+    if current_version < 2:
+        conn.executescript(_MIGRATION_V2)
+        conn.execute("PRAGMA user_version = 2")
         conn.commit()
 
 

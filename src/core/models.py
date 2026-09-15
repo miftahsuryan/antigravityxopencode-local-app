@@ -50,3 +50,25 @@ class ApiRef:
     label_ids: list[int] = field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+@dataclass
+class DocFolder:
+    id: int | None
+    name: str
+    parent_id: int | None = None
+    color: str = "#6C8CFF"
+    label_ids: list[int] = field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class DocFile:
+    id: int | None
+    title: str
+    content: str = ""
+    folder_id: int | None = None
+    file_type: str = "md"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

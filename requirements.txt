@@ -1,6 +1,7 @@
 flet>=0.24
 keyring>=25.0
 markdown>=3.5
+certifi>=2024.0
 pytest>=8.0
 black>=24.0
 ruff>=0.6

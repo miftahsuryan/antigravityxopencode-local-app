@@ -19,6 +19,7 @@ MODULES: list[tuple[str, str, Any]] = [
     ("prompts", "Prompts", ft.Icons.AUTO_AWESOME_OUTLINED),
     ("commands", "Commands", ft.Icons.TERMINAL_OUTLINED),
     ("api_refs", "API References", ft.Icons.CODE_OUTLINED),
+    ("docs", "Docs", ft.Icons.DESCRIPTION_OUTLINED),
 ]
 
 
@@ -203,7 +204,7 @@ class Sidebar:
         return ft.Row(
             [
                 ft.Text(
-                    "v1.5",
+                    "v2.0",
                     size=11,
                     color=PALETTE["text.secondary"],
                 ),

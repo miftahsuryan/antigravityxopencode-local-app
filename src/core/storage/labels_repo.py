@@ -120,6 +120,11 @@ def get_label_item_counts(conn: sqlite3.Connection) -> dict[int, dict[str, int]]
     for r in rows:
         lid = r["label_id"]
         if lid not in counts:
-            counts[lid] = {"prompts": 0, "commands": 0, "api_refs": 0}
+            counts[lid] = {
+                "prompts": 0,
+                "commands": 0,
+                "api_refs": 0,
+                "doc_folders": 0,
+            }
         counts[lid][r["item_type"]] = r["cnt"]
     return counts

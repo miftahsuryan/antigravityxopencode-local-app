@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from typing import Any
 
 import flet as ft
@@ -110,6 +111,16 @@ class ApiRefsView(BaseView):
         def _save(e: Any) -> None:
             selected_ids = get_selected_label_ids(label_checks)
             keychain_name = (keychain_field.value or "").strip()
+            if not keychain_name:
+                if is_edit and ref and ref.keychain_key_name:
+                    keychain_name = ref.keychain_key_name
+                else:
+                    slug = (
+                        (name_field.value or "api-ref").strip()
+                        .lower()
+                        .replace(" ", "-")
+                    )
+                    keychain_name = f"{slug}_{uuid.uuid4().hex[:8]}"
             if is_edit and ref:
                 ref.service_name = (name_field.value or "").strip()
                 ref.base_url = (url_field.value or "").strip()
@@ -223,7 +234,7 @@ class ApiRefsView(BaseView):
                             copy_button(
                                 ft.Icons.CONTENT_COPY,
                                 "Copy URL",
-                                lambda: copy_to_clipboard(
+                                lambda e: copy_to_clipboard(
                                     self.page,
                                     ref.base_url or ref.service_name,
                                     f'URL "{ref.service_name}" disalin!',
@@ -233,7 +244,7 @@ class ApiRefsView(BaseView):
                             copy_button(
                                 ft.Icons.KEY_OUTLINED,
                                 "Copy key",
-                                lambda: copy_to_clipboard(
+                                lambda e: copy_to_clipboard(
                                     self.page,
                                     secret_value or ref.service_name,
                                     f'API key "{ref.service_name}" disalin!',

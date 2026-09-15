@@ -9,6 +9,7 @@
   1. Prompt AI (Claude, Gemini, GPT, dll.)
   2. Command / snippet terminal
   3. Referensi API (endpoint, auth, API key di Keychain)
+  4. Dokumentasi / catatan (folder + file markdown)
 - **Target pengguna:** Single-user, 100% lokal, tanpa cloud
 - **Platform:** macOS 13+ (Apple Silicon), `.app` native
 
@@ -35,26 +36,28 @@ devcodex/
 │   ├── brand_guidelines.md
 │   ├── prompt-guide.md
 │   ├── command-guide.md
-│   └── api-reference-guide.md
+│   ├── api-reference-guide.md
+│   └── paper-trail/
 ├── src/
 │   ├── app/               # UI layer (Flet)
 │   └── core/              # business logic (models, storage, search, io)
-├── tests/                 # 47 tests
+├── tests/                 # 68 tests
 └── assets/                # icon
 ```
 
-## 4. Fitur Inti (v1.8)
+## 4. Fitur Inti (v2.0)
 
 1. **Labels** — CRUD label dengan warna, segmented view, item counts
 2. **Prompts** — CRUD + copy + favorit + markdown preview + duplicate
 3. **Commands** — CRUD + copy monospace + duplicate
 4. **API References** — CRUD + copy URL/key + Keychain secret + duplicate
-5. **Import/Export** — per-label JSON export/import
-6. **Search** — global search lintas modul
-7. **Sorting** — newest, oldest, name A-Z, name Z-A
-8. **Keyboard Shortcuts** — Cmd+N (new), Cmd+F (search), Cmd+E (export)
-9. **Hover Effects** — visual feedback pada kartu
-10. **Badge Counters** — jumlah item di sidebar
+5. **Docs** — Folder tree (max 3 level) + file manager + split-pane markdown editor + label pada folder
+6. **Import/Export** — per-label JSON export/import
+7. **Search** — global search lintas modul
+8. **Sorting** — newest, oldest, name A-Z, name Z-A
+9. **Keyboard Shortcuts** — Cmd+N (new), Cmd+F (search), Cmd+E (export)
+10. **Hover Effects** — visual feedback pada kartu
+11. **Badge Counters** — jumlah item di sidebar
 
 Fitur yang **ditunda** ke v2+: command runner, AI model integration, prompt templates, version history, bulk actions, workflow builder.
 
